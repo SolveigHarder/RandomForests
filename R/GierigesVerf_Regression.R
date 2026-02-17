@@ -233,6 +233,9 @@ predict.greedy_cart_reg <- function(object, newdata, ...) {
 
 
 
+ # wichtigste Frage: sagt der Algorithmus wie ich denn verschiedene Blätter dann durchgehen soll?
+
+
 #Testsets
 #1D
 set.seed(1)
@@ -264,7 +267,7 @@ table(yhat)
 
 
 
-
+#TestDaten 2
 
 set.seed(123)
 n <- nrow(X)
@@ -281,15 +284,5 @@ mean((y[test] - pred_test)^2)
 
 
 
-#Frage: sagt der Algorithmus wie ich denn verschiedene Blätter dann durchgehen soll?
-############################################################
-# Mini-Test (du kannst das ersetzen durch deine Daten)
-############################################################
-# set.seed(1)
-# n <- 50
-# X <- data.frame(x1 = runif(n), x2 = runif(n))
-# y <- sin(2*pi*X$x1) + rnorm(n, sd=0.2)
-#
-# model <- fit_greedy_cart_regression(X, y, max_splits=8, min_leaf_size=5)
-# yhat <- predict(model, X)
-# mean((y - yhat)^2)
+
+
