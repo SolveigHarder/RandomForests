@@ -2,16 +2,15 @@
 # Bagging für Regressionsbäume (Definition 6.25)
 
 #
-# Implementierung des Bagging-Algorithmus, Def 6.25
+# Implementierung des Bagging-Algorithmus
 
 # Lade die Baum-Funktion vom gierigen Verfahren
-source("GierigesVerf_Regression.R")
+source("R/GierigesVerf_Regression.R")
 
 
 # Hauptfunktion: Bagging für Regression
 
-#
-# Implementiert Def 6.25
+
 # - Ziehe B Bootstrap-Samples (mit Zurücklegen)
 # - Baue auf jedem Sample einen Regressions-Baum
 # - Finale Vorhersage = Mittelwert aller Baum-Vorhersagen
