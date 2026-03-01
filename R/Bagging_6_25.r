@@ -140,29 +140,24 @@ id <- sample.int(n)
 train <- id[1:round(0.7*n)]
 test  <- id[(round(0.7*n)+1):n]
 
-fit2 <- fit_greedy_cart_regression(X[train, , drop=FALSE], y[train],
+fit <- fit_greedy_cart_regression(X[train, , drop=FALSE], y[train],
                                    max_splits = 5, min_leaf_size = 5)
-
-pred_test <- predict(fit2, X[test, , drop=FALSE])
-mse <- mean((y[test] - pred_test)^2)
+yhat <- predict(fit, X[test, , drop=FALSE])
+mse <- mean((y[test] - yhat)^2)
 cat("MSE single", mse)
-
-stop("test stop")
-
 
 
 
 
 # BAGGING
 
-cat("2. Trainiere Bagging mit B=50...\n")
-bagging_model <- bagging_regression(X_train, y_train,
-                                    B = 50,
+fitB <- bagging_regression(X[train, , drop=FALSE], y[train],
+                                    B = 5,
                                     max_splits = 5,
                                     min_leaf_size = 5)
 
-pred_bagging_test <- predict(bagging_model, X_test)
-mse_bagging <- mean((y_test - pred_bagging_test)^2)
+yhat <- predict(fitB, X[test, , drop=FALSE])
+mse <- mean((y[test]-yhat)^2)
 
-cat("   MSE (Test) Bagging:", round(mse_bagging, 4), "\n\n")
+cat("MSE bagging", mse)
 
