@@ -113,41 +113,43 @@ predict.bagging_regression <- function(object, newdata, ...) {
 
 cat("---------------\n")
 
-func <- function(x) ifelse(x < -0.2, 1,
-                           ifelse(x < 0.4, 3, 0))
+
 
 # TEST VON SOLVEIG
-set.seed(4)
-n <- 100
 
-x <- sort(runif(n, -1, 1))
-y <- func(x) + rnorm(n, sd = 0.2)
+test_single_vs_bagging <- function(name, f) {
+  set.seed(4)
+  n <- 100
 
-X <- data.frame(x = x)
+  x <- sort(runif(n, -1, 1))
+  y <- f(x) + rnorm(n, sd = 0.2)
+  X <- data.frame(x = x)
 
-id <- sample.int(n)
-train <- id[1:round(0.7*n)]
-test  <- id[(round(0.7*n)+1):n]
+  id <- sample.int(n)
+  train <- id[1:round(0.7*n)]
+  test  <- id[(round(0.7*n)+1):n]
 
+  # single
+  fit <- fit_greedy_cart_regression(X[train, , drop=FALSE], y[train],
+                                    max_splits = 5, min_leaf_size = 5, print_splits = FALSE)
+  yhat <- predict(fit, X[test, , drop=FALSE])
+  mse1 <- mean((y[test] - yhat)^2)
 
-fit <- fit_greedy_cart_regression(X[train, , drop=FALSE], y[train],
-                                   max_splits = 5, min_leaf_size = 5, print_splits = FALSE)
-yhat <- predict(fit, X[test, , drop=FALSE])
-mse1 <- mean((y[test] - yhat)^2)
+  # bagging
+  fitB <- bagging_regression(X[train, , drop=FALSE], y[train],
+                             B = 5,
+                             max_splits = 5,
+                             min_leaf_size = 5, print_splits = FALSE)
+  yhat <- predict(fitB, X[test, , drop=FALSE])
+  mseB <- mean((y[test]-yhat)^2)
 
+  cat(name, "\n")
+  cat("MSE single", mse1, "\n")
+  cat("MSE bagging", mseB, "\n")
+  cat("MSE diff bag-single", mse1-mseB, "\n")
+}
 
-
-
-# BAGGING
-
-fitB <- bagging_regression(X[train, , drop=FALSE], y[train],
-                                    B = 5,
-                                    max_splits = 5,
-                                    min_leaf_size = 5, print_splits = FALSE)
-
-yhat <- predict(fitB, X[test, , drop=FALSE])
-mseB <- mean((y[test]-yhat)^2)
-
-cat("MSE single", mse1, "\n")
-cat("MSE bagging", mseB, "\n")
-cat("MSE diff bag-single", mse1-mseB, "\n")
+f_step <- function(x) ifelse(x < -0.2, 1,
+                             ifelse(x < 0.4, 3, 0))
+test_single_vs_bagging("step", f_step)
+test_single_vs_bagging("cos", cos)
