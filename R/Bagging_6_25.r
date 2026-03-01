@@ -117,14 +117,14 @@ cat("---------------\n")
 
 # TEST VON SOLVEIG
 
-test_single_vs_bagging <- function(name, f, n) {
+test_single_vs_bagging <- function(name, f, n, test_train_split=0.7) {
   x <- sort(runif(n, -1, 1))
   y <- f(x) + rnorm(n, sd = 0.2)
   X <- data.frame(x = x)
 
   id <- sample.int(n)
-  train <- id[1:round(0.7*n)]
-  test  <- id[(round(0.7*n)+1):n]
+  train <- id[1:round(test_train_split*n)]
+  test  <- id[(round(test_train_split*n)+1):n]
 
   # single
   fit <- fit_greedy_cart_regression(X[train, , drop=FALSE], y[train],
@@ -148,6 +148,7 @@ test_single_vs_bagging <- function(name, f, n) {
 
 set.seed(5)
 n <- 100
+B <- 5
 f_step <- function(x) ifelse(x < -0.2, 1,
                              ifelse(x < 0.4, 3, 0))
 test_single_vs_bagging("step", f_step, n)
