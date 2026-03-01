@@ -118,6 +118,7 @@ cat("---------------\n")
 # TEST VON SOLVEIG
 
 test_single_vs_bagging <- function(name, f, n, B, test_train_split=0.7, xmin=-1, xmax=1) {
+  set.seed(100)
   x <- sort(runif(n, xmin, xmax))
   y <- f(x) + rnorm(n, sd = 0.2)
   X <- data.frame(x = x)
@@ -140,13 +141,12 @@ test_single_vs_bagging <- function(name, f, n, B, test_train_split=0.7, xmin=-1,
   yhat <- predict(fitB, X[test, , drop=FALSE])
   mseB <- mean((y[test]-yhat)^2)
 
-  cat(name, "\n")
+  #cat(name, "\n")
   cat("MSE single", mse1, "\n")
   cat("MSE bagging", mseB, "\n")
   cat("MSE diff bag-single", mse1-mseB, "\n")
 }
 
-set.seed(100)
 f_step <- function(x) ifelse(x < -0.2, 1,
                              ifelse(x < 0.4, 3, 0))
 
@@ -157,5 +157,6 @@ n <- 200
 #test_single_vs_bagging("cos", cos, n, B)
 
 for(B in c(1, 5, 20, 100)) {
-  test_single_vs_bagging("sin", sin, n, B)
+  cat("B=", B, "\n")
+  test_single_vs_bagging("sin", f_sin, n, B)
 }
