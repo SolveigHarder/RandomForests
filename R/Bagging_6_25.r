@@ -132,6 +132,28 @@ print.bagging_regression <- function(x, ...) {
 }
 
 
+
+# TEST VON SOLVEIG
+set.seed(1)
+n <- 60
+x <- sort(runif(n, -1, 1))
+y <- ifelse(x < -0.2, 1,
+            ifelse(x < 0.4, 3, 0)) + rnorm(n, sd = 0.2)
+
+X <- data.frame(x = x)
+X
+
+#Test Workflow
+fit <- fit_greedy_cart_regression(X, y, max_splits = 5, min_leaf_size = 5)
+
+yhat <- predict(fit, X)
+cat("MSE", mean((y - yhat)^2))
+
+stop("test stop")
+
+
+
+
 #
 # BEISPIEL / TEST
 #
@@ -195,3 +217,4 @@ if (improvement > 0) {
 } else {
   cat("→ In diesem Fall war der einzelne Baum besser.\n")
 }
+
