@@ -43,10 +43,6 @@ bagging_regression <- function(X, y, B = 100, ...) {
   # Liste für alle B Bäume
   trees <- list()
 
-  cat("=== Bagging für Regression ===\n")
-  cat("Anzahl Bootstrap-Samples (B):", B, "\n")
-  cat("Anzahl Trainingspunkte (n):", n, "\n\n")
-
   # Hauptschleife: Für b = 1, ..., B
   for (b in 1:B) {
 
@@ -61,14 +57,8 @@ bagging_regression <- function(X, y, B = 100, ...) {
     # Baue Baum auf diesem Bootstrap-Sample
     # f̂ₙ*ᵇ(x) = f̂ₙ(x, X₁*ᵇ, Y₁*ᵇ, ..., Xₙ*ᵇ, Yₙ*ᵇ)
     trees[[b]] <- fit_greedy_cart_regression(X_boot, y_boot, ...)
-
-    # Fortschrittsanzeige
-    if (b %% 10 == 0 || b == B) {
-      cat(sprintf("  Bootstrap-Sample %d/%d abgeschlossen\n", b, B))
-    }
   }
 
-  cat("\n=== Bagging Training abgeschlossen ===\n\n")
 
   # Gib Bagging-Modell zurück
   structure(
@@ -122,17 +112,6 @@ predict.bagging_regression <- function(object, newdata, ...) {
 }
 
 
-# Print-Methode für Bagging-Modell
-
-print.bagging_regression <- function(x, ...) {
-  cat("Bagging Regression Modell \n")
-  cat("============================================\n")
-  cat("Anzahl Bäume (B):", x$B, "\n")
-  cat("\nNutze predict() für Vorhersagen auf neuen Daten\n")
-}
-
-
-
 # TEST VON SOLVEIG
 set.seed(4)
 n <- 100
@@ -151,8 +130,7 @@ test  <- id[(round(0.7*n)+1):n]
 fit <- fit_greedy_cart_regression(X[train, , drop=FALSE], y[train],
                                    max_splits = 5, min_leaf_size = 5)
 yhat <- predict(fit, X[test, , drop=FALSE])
-mse <- mean((y[test] - yhat)^2)
-cat("MSE single", mse)
+mse1 <- mean((y[test] - yhat)^2)
 
 
 
@@ -165,7 +143,8 @@ fitB <- bagging_regression(X[train, , drop=FALSE], y[train],
                                     min_leaf_size = 5)
 
 yhat <- predict(fitB, X[test, , drop=FALSE])
-mse <- mean((y[test]-yhat)^2)
+mseB <- mean((y[test]-yhat)^2)
 
-cat("MSE bagging", mse)
-
+cat("MSE single", mse1, "\n")
+cat("MSE bagging", mseB, "\n")
+cat("MSE diff bag-single", mse1-mseB, "\n")
