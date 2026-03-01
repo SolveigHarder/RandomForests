@@ -153,18 +153,21 @@ set.seed(123)
 f_sin <- function(x) sin(2*pi*x)
 n <- 100
 sd <- .1
-xmin <- -1
+xmin <- 0
 xmax <- 1
 test_train_split <- .7
-data <- gen_data(f_step, n, sd, xmin, xmax, test_train_split)
+
+x_grid <- seq(xmin, xmax, length.out = 5000)
+plot(x_grid, f_wiggly(x_grid), xlab="x", ylab="y", main="f_wiggly")
+
+f_wiggly <- function(x) sin(4*pi*x) + 0.5*cos(7*pi*x)
+data <- gen_data(f_wiggly, n=50, sd=0.5, xmin=-1, xmax=1, test_train_split=0.7)
 
 # single
-
-
 mse <- test_reg(data, "single", fit_greedy_cart_regression, max_splits=20, min_leaf_size=1, print_splits=FALSE)
 cat("MSE single", mse, "\n")
 
-for(B in c(1, 5, 20, 100)) {
+for(B in c(1, 5, 20, 100, 200)) {
   mse <- test_reg(data, sprintf("bagging B=%d", B), bagging_regression, B, max_splits=20, min_leaf_size=1, print_splits=FALSE)
   cat("B=", B, "MSE=", mse, "\n")
 }
