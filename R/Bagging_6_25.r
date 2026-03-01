@@ -111,14 +111,12 @@ predict.bagging_regression <- function(object, newdata, ...) {
   return(predictions)
 }
 
-cat("---------------\n")
 
-
-
-# TEST VON SOLVEIG
-
-test_single_vs_bagging <- function(B, X, y, train, test) {
-
+test_single_vs_bagging <- function(B, data) {
+  X <- data$X
+  y <- data$y
+  test <- data$test
+  train <- data$train
 
   # single
   fit <- fit_greedy_cart_regression(X[train, , drop=FALSE], y[train],
@@ -140,25 +138,42 @@ test_single_vs_bagging <- function(B, X, y, train, test) {
   cat("MSE diff bag-single", mse1-mseB, "\n")
 }
 
+gen_data <- function(f, n, sd, xmin, xmax, test_train_split) {
+  n <- 200
+  xmin<- -1
+  xmax<- 1
+  test_train_split <- .7
+  set.seed(100)
+  x <- sort(runif(n, xmin, xmax))
+  y <- f_sin(x) + rnorm(n, sd = 0.2)
+  X <- data.frame(x = x)
+
+  id <- sample.int(n)
+  train <- id[1:round(test_train_split*n)]
+  test  <- id[(round(test_train_split*n)+1):n]
+
+
+  list(
+    X=X,
+    y=y,
+    test=test,
+    train=train
+  )
+}
+
+
 f_step <- function(x) ifelse(x < -0.2, 1,
                              ifelse(x < 0.4, 3, 0))
 
 f_sin <- function(x) sin(pi*x)
-
 n <- 200
-xmin<- -1
-xmax<- 1
+sd <- .2
+xmin <- 0
+xmax <- 1
 test_train_split <- .7
-set.seed(100)
-x <- sort(runif(n, xmin, xmax))
-y <- f_sin(x) + rnorm(n, sd = 0.2)
-X <- data.frame(x = x)
-
-id <- sample.int(n)
-train <- id[1:round(test_train_split*n)]
-test  <- id[(round(test_train_split*n)+1):n]
+data <- gen_data(f_sin, n, sd, xmin, xmax, test_train_split)
 
 for(B in c(1, 5, 20, 100)) {
   cat("B=", B, "\n")
-  test_single_vs_bagging(B, X, y, train, test)
+  test_single_vs_bagging(B, data)
 }
