@@ -118,9 +118,6 @@ cat("---------------\n")
 # TEST VON SOLVEIG
 
 test_single_vs_bagging <- function(name, f, n) {
-  set.seed(4)
-
-
   x <- sort(runif(n, -1, 1))
   y <- f(x) + rnorm(n, sd = 0.2)
   X <- data.frame(x = x)
@@ -149,6 +146,7 @@ test_single_vs_bagging <- function(name, f, n) {
   cat("MSE diff bag-single", mse1-mseB, "\n")
 }
 
+set.seed(5)
 n <- 100
 f_step <- function(x) ifelse(x < -0.2, 1,
                              ifelse(x < 0.4, 3, 0))
