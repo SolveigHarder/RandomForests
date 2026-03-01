@@ -126,13 +126,8 @@ test_reg <- function(data, fit, ...) {
 }
 
 gen_data <- function(f, n, sd, xmin, xmax, test_train_split) {
-  n <- 200
-  xmin<- -1
-  xmax<- 1
-  test_train_split <- .7
-  set.seed(100)
   x <- sort(runif(n, xmin, xmax))
-  y <- f_sin(x) + rnorm(n, sd = 0.2)
+  y <- f(x) + rnorm(n, sd=sd)
   X <- data.frame(x = x)
 
   id <- sample.int(n)
@@ -150,7 +145,7 @@ gen_data <- function(f, n, sd, xmin, xmax, test_train_split) {
 
 f_step <- function(x) ifelse(x < -0.2, 1,
                              ifelse(x < 0.4, 3, 0))
-
+set.seed(123)
 f_sin <- function(x) sin(pi*x)
 n <- 100
 sd <- .2
@@ -162,10 +157,10 @@ data <- gen_data(f_sin, n, sd, xmin, xmax, test_train_split)
 # single
 
 
-mse <- test_reg(data, fit_greedy_cart_regression, max_splits=5, min_leaf_size=5, print_splits=FALSE)
+mse <- test_reg(data, fit_greedy_cart_regression, max_splits=20, min_leaf_size=1, print_splits=FALSE)
 cat("MSE single", mse, "\n")
 
 for(B in c(1, 5, 20, 100)) {
-  mse <- test_reg(data, bagging_regression, B, max_splits=5, min_leaf_size=5, print_splits=FALSE)
+  mse <- test_reg(data, bagging_regression, B, max_splits=20, min_leaf_size=1, print_splits=FALSE)
   cat("B=", B, "MSE=", mse, "\n")
 }
