@@ -112,30 +112,17 @@ predict.bagging_regression <- function(object, newdata, ...) {
 }
 
 
-test_single_vs_bagging <- function(B, data) {
+test_reg <- function(data, fit, ...) {
   X <- data$X
   y <- data$y
   test <- data$test
   train <- data$train
 
-  # single
-  fit <- fit_greedy_cart_regression(X[train, , drop=FALSE], y[train],
-                                    max_splits = 5, min_leaf_size = 5, print_splits = FALSE)
-  yhat <- predict(fit, X[test, , drop=FALSE])
-  mse1 <- mean((y[test] - yhat)^2)
+  fitted <- fit(X[train, , drop=FALSE], y[train], ...)
+  yhat <- predict(fitted, X[test, , drop=FALSE])
+  mse <- mean((y[test]-yhat)^2)
 
-  # bagging
-  fitB <- bagging_regression(X[train, , drop=FALSE], y[train],
-                             B,
-                             max_splits = 5,
-                             min_leaf_size = 5, print_splits = FALSE)
-  yhat <- predict(fitB, X[test, , drop=FALSE])
-  mseB <- mean((y[test]-yhat)^2)
-
-  #cat(name, "\n")
-  cat("MSE single", mse1, "\n")
-  cat("MSE bagging", mseB, "\n")
-  cat("MSE diff bag-single", mse1-mseB, "\n")
+  mse
 }
 
 gen_data <- function(f, n, sd, xmin, xmax, test_train_split) {
@@ -152,7 +139,6 @@ gen_data <- function(f, n, sd, xmin, xmax, test_train_split) {
   train <- id[1:round(test_train_split*n)]
   test  <- id[(round(test_train_split*n)+1):n]
 
-
   list(
     X=X,
     y=y,
@@ -166,14 +152,20 @@ f_step <- function(x) ifelse(x < -0.2, 1,
                              ifelse(x < 0.4, 3, 0))
 
 f_sin <- function(x) sin(pi*x)
-n <- 200
+n <- 100
 sd <- .2
 xmin <- 0
 xmax <- 1
 test_train_split <- .7
 data <- gen_data(f_sin, n, sd, xmin, xmax, test_train_split)
 
+# single
+
+
+mse <- test_reg(data, fit_greedy_cart_regression, max_splits=5, min_leaf_size=5, print_splits=FALSE)
+cat("MSE single", mse, "\n")
+
 for(B in c(1, 5, 20, 100)) {
-  cat("B=", B, "\n")
-  test_single_vs_bagging(B, data)
+  mse <- test_reg(data, bagging_regression, B, max_splits=5, min_leaf_size=5, print_splits=FALSE)
+  cat("B=", B, "MSE=", mse, "\n")
 }
