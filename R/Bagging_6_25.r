@@ -134,59 +134,23 @@ print.bagging_regression <- function(x, ...) {
 
 
 # TEST VON SOLVEIG
-set.seed(1)
+set.seed(4)
 n <- 60
-x <- sort(runif(n, -1, 1))
-y <- ifelse(x < -0.2, 1,
-            ifelse(x < 0.4, 3, 0)) + rnorm(n, sd = 0.2)
+id <- sample.int(n)
+train <- id[1:round(0.7*n)]
+test  <- id[(round(0.7*n)+1):n]
 
-X <- data.frame(x = x)
-X
+fit2 <- fit_greedy_cart_regression(X[train, , drop=FALSE], y[train],
+                                   max_splits = 5, min_leaf_size = 5)
 
-#Test Workflow
-fit <- fit_greedy_cart_regression(X, y, max_splits = 5, min_leaf_size = 5)
-
-yhat <- predict(fit, X)
-cat("MSE", mean((y - yhat)^2))
+pred_test <- predict(fit2, X[test, , drop=FALSE])
+mse <- mean((y[test] - pred_test)^2)
+cat("MSE single", mse)
 
 stop("test stop")
 
 
 
-
-#
-# BEISPIEL / TEST
-#
-# Testdaten
-set.seed(123)
-n <- 60
-x <- sort(runif(n, -1, 1))
-y <- ifelse(x < -0.2, 1, ifelse(x < 0.4, 3, 0)) + rnorm(n, sd = 0.2)
-X <- data.frame(x = x)
-
-# Train/Test Split
-train_idx <- 1:40
-test_idx <- 41:60
-
-X_train <- X[train_idx, , drop = FALSE]
-y_train <- y[train_idx]
-X_test <- X[test_idx, , drop = FALSE]
-y_test <- y[test_idx]
-
-cat("\n=== BEISPIEL: Vergleich Einzelner Baum vs. Bagging ===\n\n")
-
-
-# EINZELNER BAUM
-
-cat("1. Trainiere einzelnen Baum...\n")
-single_tree <- fit_greedy_cart_regression(X_train, y_train,
-                                          max_splits = 5,
-                                          min_leaf_size = 5)
-
-pred_single_test <- predict(single_tree, X_test)
-mse_single <- mean((y_test - pred_single_test)^2)
-
-cat("   MSE (Test) einzelner Baum:", round(mse_single, 4), "\n\n")
 
 
 # BAGGING
@@ -201,20 +165,4 @@ pred_bagging_test <- predict(bagging_model, X_test)
 mse_bagging <- mean((y_test - pred_bagging_test)^2)
 
 cat("   MSE (Test) Bagging:", round(mse_bagging, 4), "\n\n")
-
-
-# VERGLEICH
-
-cat("=== ERGEBNISSE ===\n")
-cat("MSE einzelner Baum:", round(mse_single, 4), "\n")
-cat("MSE Bagging:       ", round(mse_bagging, 4), "\n")
-
-improvement <- (mse_single - mse_bagging) / mse_single * 100
-cat("\nVerbesserung durch Bagging:", round(improvement, 1), "%\n")
-
-if (improvement > 0) {
-  cat("→ Bagging reduziert den Fehler\n")
-} else {
-  cat("→ In diesem Fall war der einzelne Baum besser.\n")
-}
 
