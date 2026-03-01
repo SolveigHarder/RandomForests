@@ -147,16 +147,16 @@ gen_data <- function(f, n, sd, xmin, xmax, test_train_split) {
 }
 
 
-f_step <- function(x) ifelse(x < -0.2, 1,
-                             ifelse(x < 0.4, 3, 0))
+f_step <- function(x) ifelse(x < -.66, -1,
+                             ifelse(x < 0.33, 0, 1))
 set.seed(123)
 f_sin <- function(x) sin(2*pi*x)
 n <- 100
-sd <- .2
-xmin <- 0
+sd <- .1
+xmin <- -1
 xmax <- 1
 test_train_split <- .7
-data <- gen_data(f_sin, n, sd, xmin, xmax, test_train_split)
+data <- gen_data(f_step, n, sd, xmin, xmax, test_train_split)
 
 # single
 
