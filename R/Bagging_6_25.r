@@ -117,9 +117,9 @@ cat("---------------\n")
 
 # TEST VON SOLVEIG
 
-test_single_vs_bagging <- function(name, f) {
+test_single_vs_bagging <- function(name, f, n) {
   set.seed(4)
-  n <- 100
+
 
   x <- sort(runif(n, -1, 1))
   y <- f(x) + rnorm(n, sd = 0.2)
@@ -149,7 +149,8 @@ test_single_vs_bagging <- function(name, f) {
   cat("MSE diff bag-single", mse1-mseB, "\n")
 }
 
+n <- 100
 f_step <- function(x) ifelse(x < -0.2, 1,
                              ifelse(x < 0.4, 3, 0))
-test_single_vs_bagging("step", f_step)
-test_single_vs_bagging("cos", cos)
+test_single_vs_bagging("step", f_step, n)
+test_single_vs_bagging("cos", cos, n)
