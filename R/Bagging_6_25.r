@@ -111,6 +111,7 @@ predict.bagging_regression <- function(object, newdata, ...) {
   return(predictions)
 }
 
+cat("---------------\n")
 
 # TEST VON SOLVEIG
 set.seed(4)
@@ -128,7 +129,7 @@ test  <- id[(round(0.7*n)+1):n]
 
 
 fit <- fit_greedy_cart_regression(X[train, , drop=FALSE], y[train],
-                                   max_splits = 5, min_leaf_size = 5)
+                                   max_splits = 5, min_leaf_size = 5, print_splits = FALSE)
 yhat <- predict(fit, X[test, , drop=FALSE])
 mse1 <- mean((y[test] - yhat)^2)
 
@@ -140,7 +141,7 @@ mse1 <- mean((y[test] - yhat)^2)
 fitB <- bagging_regression(X[train, , drop=FALSE], y[train],
                                     B = 5,
                                     max_splits = 5,
-                                    min_leaf_size = 5)
+                                    min_leaf_size = 5, print_splits = FALSE)
 
 yhat <- predict(fitB, X[test, , drop=FALSE])
 mseB <- mean((y[test]-yhat)^2)

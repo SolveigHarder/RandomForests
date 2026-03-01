@@ -114,7 +114,8 @@ new_node <- function(idx, y) {
 fit_greedy_cart_regression <- function(X, y,
                                        max_splits = 10^9, #Buch Abbruch: nur wenn kein Blatt mehr splitbar ist
                                        min_leaf_size = 1,
-                                       min_improve = 1e-12) { #nach Buch sonst -infinity?
+                                       min_improve = 1e-12,
+                                       print_splits = TRUE) { #nach Buch sonst -infinity?
 
   X <- as.matrix(X)
   n <- nrow(X)
@@ -186,8 +187,10 @@ fit_greedy_cart_regression <- function(X, y,
     nodes[[lid]]$left <- left_id
     nodes[[lid]]$right <- right_id
 
-    cat(sprintf("Split %d: leaf %d by j=%d at s=%.4f | score=%.4f | improvement=%.4f\n",
+    if (print_splits) {
+      cat(sprintf("Split %d: leaf %d by j=%d at s=%.4f | score=%.4f | improvement=%.4f\n",
                 k, lid, sp$j, sp$s, sp$score, best_global$improvement))
+    }
   }
 
   structure(list(nodes = nodes), class = "greedy_cart_reg")
