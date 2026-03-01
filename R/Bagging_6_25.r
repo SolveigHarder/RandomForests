@@ -113,13 +113,15 @@ predict.bagging_regression <- function(object, newdata, ...) {
 
 cat("---------------\n")
 
+func <- function(x) ifelse(x < -0.2, 1,
+                           ifelse(x < 0.4, 3, 0))
+
 # TEST VON SOLVEIG
 set.seed(4)
 n <- 100
 
 x <- sort(runif(n, -1, 1))
-y <- ifelse(x < -0.2, 1,
-            ifelse(x < 0.4, 3, 0)) + rnorm(n, sd = 0.2)
+y <- func(x) + rnorm(n, sd = 0.2)
 
 X <- data.frame(x = x)
 
