@@ -117,15 +117,8 @@ cat("---------------\n")
 
 # TEST VON SOLVEIG
 
-test_single_vs_bagging <- function(name, f, n, B, test_train_split=0.7, xmin=-1, xmax=1) {
-  set.seed(100)
-  x <- sort(runif(n, xmin, xmax))
-  y <- f(x) + rnorm(n, sd = 0.2)
-  X <- data.frame(x = x)
+test_single_vs_bagging <- function(B, X, y, train, test) {
 
-  id <- sample.int(n)
-  train <- id[1:round(test_train_split*n)]
-  test  <- id[(round(test_train_split*n)+1):n]
 
   # single
   fit <- fit_greedy_cart_regression(X[train, , drop=FALSE], y[train],
@@ -153,10 +146,19 @@ f_step <- function(x) ifelse(x < -0.2, 1,
 f_sin <- function(x) sin(pi*x)
 
 n <- 200
-#test_single_vs_bagging("step", f_step, n, B)
-#test_single_vs_bagging("cos", cos, n, B)
+xmin<- -1
+xmax<- 1
+test_train_split <- .7
+set.seed(100)
+x <- sort(runif(n, xmin, xmax))
+y <- f_sin(x) + rnorm(n, sd = 0.2)
+X <- data.frame(x = x)
+
+id <- sample.int(n)
+train <- id[1:round(test_train_split*n)]
+test  <- id[(round(test_train_split*n)+1):n]
 
 for(B in c(1, 5, 20, 100)) {
   cat("B=", B, "\n")
-  test_single_vs_bagging("sin", f_sin, n, B)
+  test_single_vs_bagging(B, X, y, train, test)
 }
