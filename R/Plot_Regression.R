@@ -1,4 +1,8 @@
 source("R/GierigesVerf_Regression.R")
+source("R/Pruning_Regression.R")
+
+# Originale Grafikparameter speichern, damit wir sie später zurücksetzen können
+.pardefault <- par(no.readonly=T)
 
 # Siehe Abbildung 6.2 (Seite 166) im Buch
 plot_regression_fit <- function(tree, X, y, title,
@@ -47,18 +51,6 @@ plot_regression_fit <- function(tree, X, y, title,
   }
   collect_splits(1) # starte von der Wurzel
   abline(v = splits, col = "blue", lty = 2)
-
-  # Legende
-  leg_txt <- c("Daten", "Originale Funktion", "Vorhersage", "Splits")
-  leg_col <- c("gray", "gray", "red", "blue")
-  leg_lty <- c(NA, 1, 1, 2)
-  leg_pch <- c(19, NA, NA, NA)
-  leg_lwd <- c(NA, 2, 2, 1)
-  keep <- c(TRUE, show_original_func, TRUE, TRUE)
-
-  legend("topright", legend = leg_txt[keep],
-         col = leg_col[keep], lty = leg_lty[keep], pch = leg_pch[keep],
-         lwd = leg_lwd[keep], bg = "white")
 }
 
 plot_using_scatter_function <- function(title, min_x = -1, max_x = 1,
@@ -71,15 +63,47 @@ plot_using_scatter_function <- function(title, min_x = -1, max_x = 1,
   X <- data.frame(x = x)
 
   # Fit
-  fit <- fit_greedy_cart_regression(X, y, max_splits = 5, min_leaf_size = 5)
+  fit <- fit_greedy_cart_regression(X, y, max_splits = 5, min_improve = 0, min_leaf_size = 5)
+  # TODO: verwende den vollausgewachsenen Baum
+  # fit <- fit_greedy_cart_regression(X, y, max_splits = .Machine$integer.max, min_improve = 0, min_leaf_size = 1)
 
-  plot_regression_fit(fit, X, y, title, input_func, show_original_func)
+  # Pruning
+  pruning_seq <- cost_complexity_sequence(fit$nodes, y)
+
+  # Wähle gestutzten Baum (hier: 2. letzter; TODO: das sollte in der Shiny-App eine Eingabe sein)
+  target_idx <- max(1, length(pruning_seq$trees) - 2)
+  fit_pruned <- structure(list(nodes = pruning_seq$trees[[target_idx]]), class = "greedy_cart_reg")
+  lambda_val <- pruning_seq$lambdas[target_idx]
+
+  # Grafik: 2 Spalten (mfrow) und Bottom-Margin (oma) für die Legende
+  par(mfrow = c(1, 2), oma = c(2, 0, 0, 0))
+
+  plot_regression_fit(fit, X, y, paste(title, "\n(Ungestutzt)"), input_func, show_original_func)
+  plot_regression_fit(fit_pruned, X, y, sprintf("%s\n(Gestutzt, Lambda = %.3f)", title, lambda_val), input_func, show_original_func)
+
+  # Legende
+  par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
+  plot(0, 0, type = "n", bty = "n", xaxt = "n", yaxt = "n")
+
+  leg_txt <- c("Daten", "Originale Funktion", "Vorhersage", "Splits")
+  leg_col <- c("gray", "gray", "red", "blue")
+  leg_lty <- c(NA, 1, 1, 2)
+  leg_pch <- c(19, NA, NA, NA)
+  leg_lwd <- c(NA, 2, 2, 1)
+  keep <- c(TRUE, show_original_func, TRUE, TRUE)
+
+  legend("bottom", legend = leg_txt[keep],
+         col = leg_col[keep], lty = leg_lty[keep], pch = leg_pch[keep],
+         lwd = leg_lwd[keep], bg = "white", xpd = TRUE, bty = "n")
+
+  # Grafikparameter zurücksetzen
+  par(.pardefault)
 }
 
 set.seed(1)
 
 plot_using_scatter_function(
-  "Gieriges Verfahren (Regression)",
+  "Regression",
   input_func = function(x) {
     ifelse(x < -0.2, 1,
            ifelse(x < 0.4, 3, 0))
@@ -88,9 +112,8 @@ plot_using_scatter_function(
 )
 
 plot_using_scatter_function(
-  "Gieriges Verfahren - Cosinus (Regression)",
+  "Regression - Cosinus",
   min_x = -pi,
   max_x = pi,
   input_func = function(x) { cos(x) }
 )
-
