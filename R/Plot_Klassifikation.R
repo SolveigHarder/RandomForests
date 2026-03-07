@@ -53,23 +53,24 @@ plot_classification_fit <- function(tree, X, y, title, input_func = NULL) {
 }
 
 
-plot_classification_comparison <- function(fit, pruning_seq, X, y, title, input_func, target_idx = NULL) {
-  if (is.null(target_idx)) {
-    # TODO: als Parameter in der Shiny-App implementieren
-    target_idx <- max(1, length(pruning_seq$trees) - 50)
-  }
-  print(pruning_seq$lambdas)
+plot_classification_comparison <- function(fit, pruning_seq, X, y, title, input_func) {
 
-  fit_pruned <- structure(list(nodes = pruning_seq$trees[[target_idx]],
-                               levels = fit$levels),
+  # TODO: als Parameter in der Shiny-App implementieren; überschreibt CV-Algo
+  # target_idx <- max(1, length(pruning_seq$trees) - 50)
+
+  cv_result <- cv_optimal_lambda(X, y, fit, pruning_seq, mode = "classification", M = 5, max_splits = 10^12)
+  best_lambda <- cv_result$best_lambda
+  best_tree_nodes <- cv_result$best_tree
+
+  cat("Optimales Lambda:", best_lambda, "\n")
+
+  fit_pruned <- structure(list(nodes = best_tree_nodes, levels = fit$levels),
                           class = "greedy_cart_clas")
-  lambda_val <- pruning_seq$lambdas[target_idx]
-
   par(mfrow = c(1, 2), oma = c(3, 0, 0, 0))
 
   # Plots generieren
   plot_classification_fit(fit, X, y, paste(title, "\n(Vollausgewachsen)"), input_func)
-  plot_classification_fit(fit_pruned, X, y, sprintf("%s\n(Gestutzt, Lambda = %.3f)", title, lambda_val), input_func)
+  plot_classification_fit(fit_pruned, X, y, sprintf("%s\n(Gestutzt, Lambda = %.3f)", title, best_lambda), input_func)
 
   # Gemeinsame Legende unten
   par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
@@ -92,7 +93,7 @@ plot_classification_comparison <- function(fit, pruning_seq, X, y, title, input_
 # Generiere Daten mit Input-Funktion und plotte
 plot_using_scatter_function <- function(title, min_x, max_x, input_func) {
   set.seed(42)
-  n <- 150
+  n <- 200
 
   # Wertebereich der input_func
   grid_vals <- input_func(seq(min_x, max_x, length.out = 1000))
@@ -113,10 +114,12 @@ plot_using_scatter_function <- function(title, min_x, max_x, input_func) {
 
   y_factor <- as.factor(y_true)
 
+  print("Fit Root")
+
   # Trainieren des vollen Baums
-  #fit <- fit_greedy_cart_classification(X, y_factor, max_splits = 100, min_improve = 0, min_leaf_size = 1)
   fit <- fit_greedy_cart_classification(X, y_factor, max_splits = .Machine$integer.max, min_improve = 0, min_leaf_size = 1)
 
+  print("CCS Root")
   pruning_seq <- cost_complexity_sequence(fit$nodes, y_factor, mode = "classification")
 
   plot_classification_comparison(fit, pruning_seq, X, y_factor, title, input_func)
@@ -125,8 +128,18 @@ plot_using_scatter_function <- function(title, min_x, max_x, input_func) {
 }
 
 plot_using_scatter_function(
-  "Klassifikation - Cosinus",
-  min_x = -pi,
-  max_x = pi,
-  input_func = function(x) { cos(x) }
+  "Klassifikation",
+  input_func = function(x) {
+    ifelse(x < -0.2, 1,
+           ifelse(x < 0.4, 3, 0))
+  },
+  min_x = -1,
+  max_x = 1
 )
+
+#plot_using_scatter_function(
+#  "Klassifikation - Cosinus",
+#  min_x = -pi,
+#  max_x = pi,
+#  input_func = function(x) { cos(x) }
+#)

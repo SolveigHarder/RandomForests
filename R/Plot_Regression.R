@@ -70,9 +70,16 @@ plot_using_scatter_function <- function(title, min_x = -1, max_x = 1,
   pruning_seq <- cost_complexity_sequence(fit$nodes, y, "regression")
 
   # Wähle gestutzten Baum (hier: 2. letzter; TODO: das sollte in der Shiny-App eine Eingabe sein)
-  target_idx <- max(1, length(pruning_seq$trees) - 2)
-  fit_pruned <- structure(list(nodes = pruning_seq$trees[[target_idx]]), class = "greedy_cart_reg")
-  lambda_val <- pruning_seq$lambdas[target_idx]
+  #target_idx <- max(1, length(pruning_seq$trees) - 2)
+  lambda_val <- cv_res_reg$best_lambda
+
+  cv_res_reg <- cv_optimal_lambda(X, y, mode = "regression", M = 5, max_splits = .Machine$integer.max)
+
+  cat("Optimales Lambda:", cv_res_reg$best_lambda, "\n")
+  cat("Index des besten Teilbaums in der Sequenz:", cv_res_reg$best_p_full, "\n")
+
+  # Den besten Baum direkt extrahieren:
+  fit_pruned <- structure(list(nodes = cv_res_reg$final_tree_nodes), class = "greedy_cart_reg")
 
   # Grafik: 2 Spalten (mfrow) und Bottom-Margin (oma) für die Legende
   par(mfrow = c(1, 2), oma = c(2, 0, 0, 0))
@@ -101,14 +108,14 @@ plot_using_scatter_function <- function(title, min_x = -1, max_x = 1,
 
 set.seed(1)
 
-plot_using_scatter_function(
-  "Regression",
-  input_func = function(x) {
-    ifelse(x < -0.2, 1,
-           ifelse(x < 0.4, 3, 0))
-  },
-  show_original_func = FALSE
-)
+#plot_using_scatter_function(
+#  "Regression",
+#  input_func = function(x) {
+#    ifelse(x < -0.2, 1,
+#           ifelse(x < 0.4, 3, 0))
+#  },
+#  show_original_func = FALSE
+#)
 
 plot_using_scatter_function(
   "Regression - Cosinus",

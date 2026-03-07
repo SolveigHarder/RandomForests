@@ -1,3 +1,6 @@
+source("R/GierigesVerf_Regression.R")
+source("R/GierigesVerf_Klassifikation.R")
+
 # Finde alle Indizes der Blätter unterhalb eines bestimmten Knoten
 get_leaves_of_subtree <- function(nodes, node_idx) {
   leaves <- c() # Indizes der Blätter
@@ -24,14 +27,18 @@ get_leaves_of_subtree <- function(nodes, node_idx) {
 get_node_error <- function(node, y, mode = "regression") {
   idx <- node$idx
 
+
   if (mode == "regression") {
     if (length(idx) <= 1) return(0)
-    mu <- node$pred
+    # Dynamisch den Mittelwert bestimmen, da node$pred bei inneren Knoten fehlen kann
+    mu <- mean(y[idx])
     return(sum((y[idx] - mu)^2) / length(y))
 
   } else if (mode == "classification") {
     if (length(idx) == 0) return(0)
-    pred_class <- node$pred
+    # Dynamisch die Mehrheitsklasse bestimmen
+    tab <- table(y[idx])
+    pred_class <- names(tab)[which.max(tab)]
     return(sum(y[idx] != pred_class) / length(y))
 
   } else {
@@ -89,12 +96,23 @@ prune_weakest_link <- function(nodes, y, mode) {
   # Die Kindsknoten werden abgeschnitten, befinden sich (und ihre Kinder) aber
   # weiterhin im nodes-Vektor. Das hat keine Auswirkung auf den Hauptbaum.
 
+  # Setze den Vorhersagewert (pred) für das neue Blatt
+  idx <- nodes[[weakest_link_idx]]$idx
+  if (length(idx) > 0) {
+    if (mode == "regression") {
+      nodes[[weakest_link_idx]]$pred <- mean(y[idx])
+    } else {
+      tab <- table(y[idx])
+      nodes[[weakest_link_idx]]$pred <- names(tab)[which.max(tab)]
+    }
+  }
+
   return(list(nodes = nodes, lambda = min_lambda, pruned = TRUE))
 }
 
 # Generiert die gesamte Sequenz der gestutzten Bäume
 cost_complexity_sequence <- function(initial_nodes, y, mode) {
-  stopifnot("Paraneter 'mode' muss 'regression' oder 'classification' enthalten" = mode %in% c("regression", "classification"))
+  stopifnot("Parameter 'mode' muss 'regression' oder 'classification' enthalten" = mode %in% c("regression", "classification"))
 
   tree_sequence <- list()
   lambda_sequence <- numeric()
@@ -124,8 +142,147 @@ cost_complexity_sequence <- function(initial_nodes, y, mode) {
     step <- step + 1
   }
 
+  unique_lambdas <- unique(lambda_sequence)
+  final_trees <- list()
+  final_lambdas <- numeric(length(unique_lambdas))
+
+  for (i in seq_along(unique_lambdas)) {
+    lam <- unique_lambdas[i]
+    # Finde den letzten Index in der unbereinigten Liste, der dieses Lambda hat
+    last_idx <- max(which(lambda_sequence == lam))
+
+    final_lambdas[i] <- lam
+    final_trees[[i]] <- tree_sequence[[last_idx]]
+  }
+
   return(list(
-    trees = tree_sequence,
-    lambdas = lambda_sequence
+    trees = final_trees,
+    lambdas = final_lambdas
   ))
 }
+
+# --------------------------------------------------------------------
+# Automatische Lambdabestimmung (mit Cross-Validation) nach Bem. 6.21
+
+# Aus Lemma 6.20: Findet den Index p in der Sequenz, der R_n(f_T^(p)) + lambda * #T^(p) minimiert
+get_optimal_tree_for_lambda <- function(pruning_seq, lambda, y_train, mode) {
+  P <- length(pruning_seq$trees)
+  scores <- numeric(P)
+
+  for (p in 1:P) {
+    nodes_p <- pruning_seq$trees[[p]]
+
+    # R_n(T^(p)) - Empirisches Risiko auf den Trainingsdaten
+    R_n <- get_subtree_error(nodes_p, 1, y_train, mode = mode)
+    # #T^(p) - Anzahl der Blätter des Teilbaums
+    num_leaves <- length(get_leaves_of_subtree(nodes_p, 1))
+    # Gütekriterium berechnen
+    scores[p] <- R_n + lambda * num_leaves
+  }
+
+  min_score <- min(scores)
+
+  # Workaround: Toleranz für Fließkommazahl-Ungenauigkeiten
+  best_indices <- which(scores <= min_score + 1e-9)
+
+  # Wähle den am stärksten geprunten Baum (höchster Index in der Sequenz)
+  return(max(best_indices))
+}
+
+# Aus Bemerkung 6.21: M-Fold Cross-Validation
+cv_optimal_lambda <- function(X, y, fit, seq_full, mode, M = 5, max_splits = .Machine$integer.max) {
+  n <- nrow(X)
+
+  lambdas <- seq_full$lambdas
+  if (length(lambdas) == 0) lambdas <- c(0)
+
+  y <- if (mode == "classification") as.factor(y) else as.numeric(y)
+  folds <- sample(rep(1:M, length.out = n))
+  cv_errors <- rep(0, length(lambdas))
+
+  for (m in 1:M) {
+    cat("Fold", m, "\n")
+    test_idx <- which(folds == m)
+    train_idx <- setdiff(1:n, test_idx)
+
+    X_train <- X[train_idx, , drop = FALSE]
+    y_train <- y[train_idx]
+    X_test <- X[test_idx, , drop = FALSE]
+    y_test <- y[test_idx]
+
+    # Ermittle T_n(m) auf {1..n} \ I_m und die Pruning-Sequenz
+    if (mode == "regression") {
+      fit_m <- fit_greedy_cart_regression(X_train, y_train, max_splits = max_splits)
+    } else {
+      fit_m <- fit_greedy_cart_classification(X_train, y_train, max_splits = max_splits)
+    }
+    seq_m <- cost_complexity_sequence(fit_m$nodes, y_train, mode = mode)
+
+    for (k in seq_along(lambdas)) {
+      lam <- lambdas[k]
+
+      # Lemma 6.20 anwenden um p_hat(lambda, m) zu finden
+      best_p <- get_optimal_tree_for_lambda(seq_m, lam, y_train, mode = mode)
+      best_nodes <- seq_m$trees[[best_p]]
+
+      temp_fit <- list(nodes = best_nodes)
+
+      # Fehler auf dem Testset berechnen
+      if (mode == "regression") {
+        class(temp_fit) <- "greedy_cart_reg"
+        preds <- predict(temp_fit, X_test)
+        err <- sum((y_test - preds)^2)
+      } else {
+        temp_fit$levels <- fit_m$levels
+        class(temp_fit) <- "greedy_cart_clas"
+        preds <- predict(temp_fit, X_test)
+        err <- sum(y_test != preds)
+      }
+      print(err)
+
+      cv_errors[k] <- cv_errors[k] + err
+    }
+  }
+
+  # Durchschn. Fehler
+  cv_errors <- cv_errors / n
+
+  min_cv_error <- min(cv_errors)
+
+  # Es kann mehrere Bäume geben, die den minimalen CV-Fehler erreichen
+  best_indices <- which(cv_errors == min_cv_error & lambdas > 0)
+  if (length(best_indices) == 0) {
+    best_indices <- which(cv_errors == min_cv_error)
+  }
+
+  # TODO: wie wählt man hier am besten aus?
+  best_tree_idx <- min(best_indices)
+  best_lambda <- lambdas[best_tree_idx]
+
+  print("cv_errors")
+  print(cv_errors)
+  print("lambdas")
+  print(lambdas)
+  print("best_tree_idx")
+  print(best_tree_idx)
+
+  structure(
+    list(best_lambda = best_lambda, best_tree = seq_full$trees[[best_tree_idx]]),
+    class = "cross_validation_result"
+  )
+}
+
+
+set.seed(1)
+n <- 150
+X <- matrix(runif(n * 2, -5, 5), ncol = 2)
+y <- sin(X[, 1]) + cos(X[, 2]) + rnorm(n, 0, 0.5)
+
+# 5-Fold Cross Validation für Regression
+#cv_res_reg <- cv_optimal_lambda(X, y, mode = "regression", M = 5, max_splits = .Machine$integer.max)
+
+#cat("Optimales Lambda:", cv_res_reg$best_lambda, "\n")
+#cat("Index des besten Teilbaums in der Sequenz:", cv_res_reg$best_p_full, "\n")
+
+# Den besten Baum direkt extrahieren:
+#bester_baum_reg <- structure(list(nodes = cv_res_reg$final_tree_nodes), class = "greedy_cart_reg")
