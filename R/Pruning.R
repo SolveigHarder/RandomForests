@@ -30,13 +30,12 @@ get_node_error <- function(node, y, mode = "regression") {
 
   if (mode == "regression") {
     if (length(idx) <= 1) return(0)
-    # Dynamisch den Mittelwert bestimmen, da node$pred bei inneren Knoten fehlen kann
     mu <- mean(y[idx])
     return(sum((y[idx] - mu)^2) / length(y))
 
   } else if (mode == "classification") {
     if (length(idx) == 0) return(0)
-    # Dynamisch die Mehrheitsklasse bestimmen
+    # Mehrheitsklasse bestimmen
     tab <- table(y[idx])
     pred_class <- names(tab)[which.max(tab)]
     return(sum(y[idx] != pred_class) / length(y))
@@ -161,7 +160,6 @@ cost_complexity_sequence <- function(initial_nodes, y, mode) {
   ))
 }
 
-# --------------------------------------------------------------------
 # Automatische Lambdabestimmung (mit Cross-Validation) nach Bem. 6.21
 
 # Aus Lemma 6.20: Findet den Index p in der Sequenz, der R_n(f_T^(p)) + lambda * #T^(p) minimiert
@@ -182,7 +180,7 @@ get_optimal_tree_for_lambda <- function(pruning_seq, lambda, y_train, mode) {
 
   min_score <- min(scores)
 
-  # Workaround: Toleranz für Fließkommazahl-Ungenauigkeiten
+  # workaround: Toleranz für Float-Ungenauigk.
   best_indices <- which(scores <= min_score + 1e-9)
 
   # Wähle den am stärksten geprunten Baum (höchster Index in der Sequenz)
@@ -238,7 +236,6 @@ cv_optimal_lambda <- function(X, y, fit, seq_full, mode, M = 5, max_splits = .Ma
         preds <- predict(temp_fit, X_test)
         err <- sum(y_test != preds)
       }
-      print(err)
 
       cv_errors[k] <- cv_errors[k] + err
     }
@@ -263,26 +260,10 @@ cv_optimal_lambda <- function(X, y, fit, seq_full, mode, M = 5, max_splits = .Ma
   print(cv_errors)
   print("lambdas")
   print(lambdas)
-  print("best_tree_idx")
-  print(best_tree_idx)
+  cat("best_tree_idx:", best_tree_idx)
 
   structure(
     list(best_lambda = best_lambda, best_tree = seq_full$trees[[best_tree_idx]]),
     class = "cross_validation_result"
   )
 }
-
-
-set.seed(1)
-n <- 150
-X <- matrix(runif(n * 2, -5, 5), ncol = 2)
-y <- sin(X[, 1]) + cos(X[, 2]) + rnorm(n, 0, 0.5)
-
-# 5-Fold Cross Validation für Regression
-#cv_res_reg <- cv_optimal_lambda(X, y, mode = "regression", M = 5, max_splits = .Machine$integer.max)
-
-#cat("Optimales Lambda:", cv_res_reg$best_lambda, "\n")
-#cat("Index des besten Teilbaums in der Sequenz:", cv_res_reg$best_p_full, "\n")
-
-# Den besten Baum direkt extrahieren:
-#bester_baum_reg <- structure(list(nodes = cv_res_reg$final_tree_nodes), class = "greedy_cart_reg")
