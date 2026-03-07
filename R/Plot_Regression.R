@@ -63,9 +63,8 @@ plot_using_scatter_function <- function(title, min_x = -1, max_x = 1,
   X <- data.frame(x = x)
 
   # Fit
-  fit <- fit_greedy_cart_regression(X, y, max_splits = 5, min_improve = 0, min_leaf_size = 5)
-  # TODO: verwende den vollausgewachsenen Baum
-  # fit <- fit_greedy_cart_regression(X, y, max_splits = .Machine$integer.max, min_improve = 0, min_leaf_size = 1)
+  # fit <- fit_greedy_cart_regression(X, y, max_splits = 5, min_improve = 0, min_leaf_size = 5)
+  fit <- fit_greedy_cart_regression(X, y, max_splits = .Machine$integer.max, min_improve = 0, min_leaf_size = 1)
 
   # Pruning
   pruning_seq <- cost_complexity_sequence(fit$nodes, y, "regression")
@@ -78,7 +77,7 @@ plot_using_scatter_function <- function(title, min_x = -1, max_x = 1,
   # Grafik: 2 Spalten (mfrow) und Bottom-Margin (oma) für die Legende
   par(mfrow = c(1, 2), oma = c(2, 0, 0, 0))
 
-  plot_regression_fit(fit, X, y, paste(title, "\n(Ungestutzt)"), input_func, show_original_func)
+  plot_regression_fit(fit, X, y, paste(title, "\n(Ungestutzt, vollausgewachsen)"), input_func, show_original_func)
   plot_regression_fit(fit_pruned, X, y, sprintf("%s\n(Gestutzt, Lambda = %.3f)", title, lambda_val), input_func, show_original_func)
 
   # Legende
