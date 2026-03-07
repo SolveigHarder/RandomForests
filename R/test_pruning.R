@@ -1,4 +1,6 @@
 source("R/GierigesVerf_Regression.R")
+source("R/GierigesVerf_Klassifikation.R")
+source("R/Pruning.R")
 
 set.seed(1)
 n <- 150
@@ -6,11 +8,16 @@ X <- matrix(runif(n * 2, -5, 5), ncol = 2)
 y <- sin(X[, 1]) + cos(X[, 2]) + rnorm(n, 0, 0.5)
 
 tree_model <- fit_greedy_cart_regression(X, y, max_splits = 20)
+cat("Regressionsbaum fertig. Anzahl Knoten:", length(tree_model$nodes), "\n")
 
-cat("Baum fertig. Anzahl Knoten:", length(tree_model$nodes), "\n")
-
-pruning_result <- cost_complexity_sequence(tree_model$nodes, y)
-
+pruning_result <- cost_complexity_sequence(tree_model$nodes, y, "regression")
 cat("Anzahl der Teilbäume in der Sequenz:", length(pruning_result$trees), "\n")
 cat("Werte für Lambda:", round(pruning_result$lambdas, 4), "\n")
 
+
+tree_model_cls <- fit_greedy_cart_classification(X, y, max_splits = 20)
+cat("Klassifikationsbaum fertig. Anzahl Knoten:", length(tree_model_cls$nodes), "\n")
+
+pruning_result <- cost_complexity_sequence(tree_model_cls$nodes, y, "classification")
+cat("Anzahl der Teilbäume in der Sequenz:", length(pruning_result$trees), "\n")
+cat("Werte für Lambda:", round(pruning_result$lambdas, 4), "\n")

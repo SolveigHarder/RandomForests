@@ -1,5 +1,5 @@
 source("R/GierigesVerf_Regression.R")
-source("R/Pruning_Regression.R")
+source("R/Pruning.R")
 
 # Originale Grafikparameter speichern, damit wir sie später zurücksetzen können
 .pardefault <- par(no.readonly=T)
@@ -68,7 +68,7 @@ plot_using_scatter_function <- function(title, min_x = -1, max_x = 1,
   # fit <- fit_greedy_cart_regression(X, y, max_splits = .Machine$integer.max, min_improve = 0, min_leaf_size = 1)
 
   # Pruning
-  pruning_seq <- cost_complexity_sequence(fit$nodes, y)
+  pruning_seq <- cost_complexity_sequence(fit$nodes, y, "regression")
 
   # Wähle gestutzten Baum (hier: 2. letzter; TODO: das sollte in der Shiny-App eine Eingabe sein)
   target_idx <- max(1, length(pruning_seq$trees) - 2)

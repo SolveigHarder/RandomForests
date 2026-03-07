@@ -1,5 +1,3 @@
-source("R/GierigesVerf_Regression.R")
-
 # Finde alle Indizes der Blätter unterhalb eines bestimmten Knoten
 get_leaves_of_subtree <- function(nodes, node_idx) {
   leaves <- c() # Indizes der Blätter
@@ -22,26 +20,37 @@ get_leaves_of_subtree <- function(nodes, node_idx) {
   return(leaves)
 }
 
-# Berechnet den Trainingsfehler eines Knotens
-get_node_sse <- function(node, y) {
+# Berechnet den Trainingsfehler eines Knotens abhängig vom Modus
+get_node_error <- function(node, y, mode = "regression") {
   idx <- node$idx
-  if (length(idx) <= 1) return(0)
-  mu <- node$pred
-  sum((y[idx] - mu)^2) / length(y)
+
+  if (mode == "regression") {
+    if (length(idx) <= 1) return(0)
+    mu <- node$pred
+    return(sum((y[idx] - mu)^2) / length(y))
+
+  } else if (mode == "classification") {
+    if (length(idx) == 0) return(0)
+    pred_class <- node$pred
+    return(sum(y[idx] != pred_class) / length(y))
+
+  } else {
+    stop("mode value is invalid")
+  }
 }
 
 # Berechnet den Trainingsfehler eines Teilbaums R(T_t)
-get_subtree_sse <- function(nodes, node_idx, y) {
+get_subtree_error <- function(nodes, node_idx, y, mode) {
   leaf_indices <- get_leaves_of_subtree(nodes, node_idx)
   total <- 0
   for (l_idx in leaf_indices) {
-    total <- total + get_node_sse(nodes[[l_idx]], y)
+    total <- total + get_node_error(nodes[[l_idx]], y, mode)
   }
   return(total)
 }
 
 # Findet und eliminiert den Weakest Link
-prune_weakest_link <- function(nodes, y) {
+prune_weakest_link <- function(nodes, y, mode) {
   values <- rep(Inf, length(nodes))
 
   for (i in seq_along(nodes)) {
@@ -51,9 +60,9 @@ prune_weakest_link <- function(nodes, y) {
     if (!is.null(node) &&!node$is_leaf) {
       leaves_in_subtree <- get_leaves_of_subtree(nodes, i)
       # R_t = R_n(f_T)
-      R_t <- get_node_sse(node, y)
+      R_t <- get_node_error(node, y, mode)
       # R_T_t = R_n(f_T^(p-1))
-      R_T_t <- get_subtree_sse(nodes, i, y)
+      R_T_t <- get_subtree_error(nodes, i, y, mode)
       # N_T_t = #T^(p-1) - 1
       # N_T_t = Anzahl Blätter im Subtree, der abgeschnitten wird
       N_T_t <- length(leaves_in_subtree)
@@ -84,7 +93,9 @@ prune_weakest_link <- function(nodes, y) {
 }
 
 # Generiert die gesamte Sequenz der gestutzten Bäume
-cost_complexity_sequence <- function(initial_nodes, y) {
+cost_complexity_sequence <- function(initial_nodes, y, mode) {
+  stopifnot("Paraneter 'mode' muss 'regression' oder 'classification' enthalten" = mode %in% c("regression", "classification"))
+
   tree_sequence <- list()
   lambda_sequence <- numeric()
 
@@ -101,7 +112,7 @@ cost_complexity_sequence <- function(initial_nodes, y) {
       break
     }
 
-    result <- prune_weakest_link(current_nodes, y)
+    result <- prune_weakest_link(current_nodes, y, mode)
     if (!result$pruned) {
       break
     }
