@@ -88,19 +88,40 @@ predict.bagging_classification <- function(object, newdata, ...) {
 
 # Test
 
+gen_data <- function(f, n, noise, xmin, xmax, test_train_split) {
+  x <- sort(runif(n, xmin, xmax))
+  y <- f(x)
+  flip <- runif(n) < noise
+  y[flip] <- sample(1:3, sum(flip), replace = TRUE)
+
+  X <- data.frame(x = x)
+  id <- sample.int(n)
+  train <- id[1:round(test_train_split*n)]
+  test  <- id[(round(test_train_split*n)+1):n]
+
+  list(X=X, y=y, train=train, test=test)
+}
+
+
+test_classification <- function(data, fit) {
+
+}
+
+
 set.seed(1)
 n <- 150
-x <- sort(runif(n, -1, 1))
-y <- ifelse(x < -0.2, 1, ifelse(x < 0.4, 2, 3))
-flip <- runif(n) < 0.10
-y[flip] <- sample(1:3, sum(flip), replace = TRUE)
+noise <- .1
+xmin <- -1
+xmax <- 1
+test_train_split <- .7
 
-X <- data.frame(x = x)
+f_step <- function(x) ifelse(x < -0.2, 1, ifelse(x < 0.4, 2, 3))
 
-set.seed(2)
-id <- sample.int(n)
-train <- id[1:round(0.7*n)]
-test  <- id[(round(0.7*n)+1):n]
+data <- gen_data(f_step, n, noise, xmin, xmax, test_train_split)
+X <- data$X
+y <- data$y
+test <- data$test
+train <- data$train
 
 # Einzelner Baum
 fit_single <- fit_greedy_cart_classification(X[train, , drop=FALSE], y[train],
