@@ -117,7 +117,8 @@ plot_using_scatter_function <- function(title, min_x, max_x, input_func) {
   print("Fit Root")
 
   # Trainieren des vollen Baums
-  fit <- fit_greedy_cart_classification(X, y_factor, max_splits = .Machine$integer.max, min_improve = 0, min_leaf_size = 1)
+  fit <- fit_greedy_cart_classification(X, y_factor, max_splits = .Machine$integer.max,
+                                        min_improve = 0, min_leaf_size = 1, print_splits = FALSE)
 
   print("CCS Root")
   pruning_seq <- cost_complexity_sequence(fit$nodes, y_factor, mode = "classification")
@@ -127,19 +128,19 @@ plot_using_scatter_function <- function(title, min_x, max_x, input_func) {
   print("Done")
 }
 
-plot_using_scatter_function(
-  "Klassifikation",
-  input_func = function(x) {
-    ifelse(x < -0.2, 1,
-           ifelse(x < 0.4, 3, 0))
-  },
-  min_x = -1,
-  max_x = 1
-)
-
 #plot_using_scatter_function(
-#  "Klassifikation - Cosinus",
-#  min_x = -pi,
-#  max_x = pi,
-#  input_func = function(x) { cos(x) }
+#  "Klassifikation",
+#  input_func = function(x) {
+#    ifelse(x < -0.2, 1,
+#           ifelse(x < 0.4, 3, 0))
+#  },
+#  min_x = -1,
+#  max_x = 1
 #)
+
+plot_using_scatter_function(
+  "Klassifikation - Sinus",
+  min_x = -pi,
+  max_x = pi,
+  input_func = function(x) { sin(x) }
+)

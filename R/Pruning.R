@@ -210,9 +210,9 @@ cv_optimal_lambda <- function(X, y, fit, seq_full, mode, M = 5, max_splits = .Ma
 
     # Ermittle T_n(m) auf {1..n} \ I_m und die Pruning-Sequenz
     if (mode == "regression") {
-      fit_m <- fit_greedy_cart_regression(X_train, y_train, max_splits = max_splits)
+      fit_m <- fit_greedy_cart_regression(X_train, y_train, max_splits = max_splits, print_splits = FALSE)
     } else {
-      fit_m <- fit_greedy_cart_classification(X_train, y_train, max_splits = max_splits)
+      fit_m <- fit_greedy_cart_classification(X_train, y_train, max_splits = max_splits, print_splits = FALSE)
     }
     seq_m <- cost_complexity_sequence(fit_m$nodes, y_train, mode = mode)
 
@@ -260,7 +260,7 @@ cv_optimal_lambda <- function(X, y, fit, seq_full, mode, M = 5, max_splits = .Ma
   print(cv_errors)
   print("lambdas")
   print(lambdas)
-  cat("best_tree_idx:", best_tree_idx)
+  cat("best_tree_idx:", best_tree_idx, "\n")
 
   structure(
     list(best_lambda = best_lambda, best_tree = seq_full$trees[[best_tree_idx]]),
