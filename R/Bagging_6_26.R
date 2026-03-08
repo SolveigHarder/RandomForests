@@ -116,8 +116,9 @@ xmax <- 1
 test_train_split <- .7
 
 f_step <- function(x) ifelse(x < -0.2, 1, ifelse(x < 0.4, 2, 3))
+f_sin3 <- function(x) ifelse(sin(2*x) > 0.3, 1, ifelse(sin(2*x) > -0.3, 2, 3))
 
-data <- gen_data(f_step, n, noise, xmin, xmax, test_train_split)
+data <- gen_data(f_sin3, n, noise, xmin, xmax, test_train_split)
 X <- data$X
 y <- data$y
 test <- data$test
