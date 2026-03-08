@@ -63,29 +63,29 @@ plot_using_scatter_function <- function(title, min_x = -1, max_x = 1,
   X <- data.frame(x = x)
 
   # Fit
-  # fit <- fit_greedy_cart_regression(X, y, max_splits = 5, min_improve = 0, min_leaf_size = 5)
-  fit <- fit_greedy_cart_regression(X, y, max_splits = .Machine$integer.max, min_improve = 0, min_leaf_size = 1)
+  fit <- fit_greedy_cart_regression(X, y, max_splits = .Machine$integer.max,
+                                    min_improve = 0, min_leaf_size = 1, print_splits = FALSE)
 
   # Pruning
   pruning_seq <- cost_complexity_sequence(fit$nodes, y, "regression")
 
-  # Wähle gestutzten Baum (hier: 2. letzter; TODO: das sollte in der Shiny-App eine Eingabe sein)
-  #target_idx <- max(1, length(pruning_seq$trees) - 2)
-  lambda_val <- cv_res_reg$best_lambda
+  # TODO: als Parameter in der Shiny-App implementieren; überschreibt CV-Algo
+  # target_idx <- max(1, length(pruning_seq$trees) - 50)
 
-  cv_res_reg <- cv_optimal_lambda(X, y, mode = "regression", M = 5, max_splits = .Machine$integer.max)
+  cv_result <- cv_optimal_lambda(X, y, fit, pruning_seq, mode = "regression", M = 5, max_splits = 10^12)
+  best_lambda <- cv_result$best_lambda
+  best_tree_nodes <- cv_result$best_tree
 
-  cat("Optimales Lambda:", cv_res_reg$best_lambda, "\n")
-  cat("Index des besten Teilbaums in der Sequenz:", cv_res_reg$best_p_full, "\n")
+  cat("Optimales Lambda:", best_lambda, "\n")
 
   # Den besten Baum direkt extrahieren:
-  fit_pruned <- structure(list(nodes = cv_res_reg$final_tree_nodes), class = "greedy_cart_reg")
+  fit_pruned <- structure(list(nodes = best_tree_nodes), class = "greedy_cart_reg")
 
   # Grafik: 2 Spalten (mfrow) und Bottom-Margin (oma) für die Legende
   par(mfrow = c(1, 2), oma = c(2, 0, 0, 0))
 
-  plot_regression_fit(fit, X, y, paste(title, "\n(Ungestutzt, vollausgewachsen)"), input_func, show_original_func)
-  plot_regression_fit(fit_pruned, X, y, sprintf("%s\n(Gestutzt, Lambda = %.3f)", title, lambda_val), input_func, show_original_func)
+  plot_regression_fit(fit, X, y, paste(title, "\n(Ungestutzt, voll ausgewachsen)"), input_func, show_original_func)
+  plot_regression_fit(fit_pruned, X, y, sprintf("%s\n(Gestutzt, Lambda = %.3f)", title, best_lambda), input_func, show_original_func)
 
   # Legende
   par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
@@ -123,3 +123,4 @@ plot_using_scatter_function(
   max_x = pi,
   input_func = function(x) { cos(x) }
 )
+

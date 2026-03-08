@@ -69,7 +69,7 @@ plot_classification_comparison <- function(fit, pruning_seq, X, y, title, input_
   par(mfrow = c(1, 2), oma = c(3, 0, 0, 0))
 
   # Plots generieren
-  plot_classification_fit(fit, X, y, paste(title, "\n(Vollausgewachsen)"), input_func)
+  plot_classification_fit(fit, X, y, paste(title, "\n(Voll ausgewachsen)"), input_func)
   plot_classification_fit(fit_pruned, X, y, sprintf("%s\n(Gestutzt, Lambda = %.3f)", title, best_lambda), input_func)
 
   # Gemeinsame Legende unten

@@ -1,6 +1,3 @@
-source("R/GierigesVerf_Regression.R")
-source("R/GierigesVerf_Klassifikation.R")
-
 # Finde alle Indizes der Blätter unterhalb eines bestimmten Knoten
 get_leaves_of_subtree <- function(nodes, node_idx) {
   leaves <- c() # Indizes der Blätter
