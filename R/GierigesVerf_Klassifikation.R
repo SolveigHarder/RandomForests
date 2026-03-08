@@ -205,8 +205,10 @@ fit_greedy_cart_classification <- function(X, y,
     nodes[[lid]]$left <- left_id
     nodes[[lid]]$right <- right_id
 
-    cat(sprintf("Split %d: leaf %d by j=%d at s=%.4f | score=%.4f | improvement=%.4f\n",
+    if (print_splits) {
+      cat(sprintf("Split %d: leaf %d by j=%d at s=%.4f | score=%.4f | improvement=%.4f\n",
                 k, lid, sp$j, sp$s, sp$score, best_global$improvement))
+    }
   }
 
   structure(list(nodes = nodes, levels = levels(y)), class = "greedy_cart_clas")

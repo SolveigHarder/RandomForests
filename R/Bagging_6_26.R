@@ -104,14 +104,14 @@ test  <- id[(round(0.7*n)+1):n]
 
 # Einzelner Baum
 fit_single <- fit_greedy_cart_classification(X[train, , drop=FALSE], y[train],
-                                             max_splits = 10, min_leaf_size = 10)
+                                             max_splits = 10, min_leaf_size = 10, print_splits = FALSE)
 pred_single <- predict(fit_single, X[test, , drop=FALSE])
 cat("Einzelner Baum - Fehlerrate:", mean(pred_single != y[test]), "\n")
 
 # Bagging mit verschiedenen B
 for (B in c(5, 20, 100)) {
   fit_bag <- bagging_classification(X[train, , drop=FALSE], y[train],
-                                    B = B, max_splits = 10, min_leaf_size = 10)
+                                    B = B, max_splits = 10, min_leaf_size = 10, print_splits = FALSE)
   pred_bag <- predict(fit_bag, X[test, , drop=FALSE])
   cat(sprintf("B=%3d - Fehlerrate: %.4f\n", B, mean(pred_bag != y[test])))
 }
