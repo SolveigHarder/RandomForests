@@ -109,10 +109,10 @@ test_classification <- function(data, fit) {
 
 
 set.seed(1)
-n <- 150
+n <- 500
 noise <- .1
-xmin <- -1
-xmax <- 1
+xmin <- 0
+xmax <- 2*pi
 test_train_split <- .7
 
 f_step <- function(x) ifelse(x < -0.2, 1, ifelse(x < 0.4, 2, 3))
@@ -126,14 +126,24 @@ train <- data$train
 
 # Einzelner Baum
 fit_single <- fit_greedy_cart_classification(X[train, , drop=FALSE], y[train],
-                                             max_splits = 10, min_leaf_size = 10, print_splits = FALSE)
+                                             max_splits = 50, min_leaf_size = 3, print_splits = FALSE)
 pred_single <- predict(fit_single, X[test, , drop=FALSE])
 cat("Einzelner Baum - Fehlerrate:", mean(pred_single != y[test]), "\n")
 
 # Bagging mit verschiedenen B
 for (B in c(5, 20, 100)) {
   fit_bag <- bagging_classification(X[train, , drop=FALSE], y[train],
-                                    B = B, max_splits = 10, min_leaf_size = 10, print_splits = FALSE)
+                                    B = B, max_splits = 50, min_leaf_size = 3, print_splits = FALSE)
   pred_bag <- predict(fit_bag, X[test, , drop=FALSE])
   cat(sprintf("B=%3d - Fehlerrate: %.4f\n", B, mean(pred_bag != y[test])))
+  # check
+  #single_errors <- sapply(fit_bag$trees, function(tree) {
+  #  p <- predict(tree, X[test,,drop=FALSE])
+  #  mean(p != y[test])
+  #})
+  #cat("Individual tree errors:", round(single_errors, 3), "\n")
+  #cat("Mean:", mean(single_errors), "\n")
+  #p1 <- as.character(predict(fit_bag$trees[[1]], X[test,,drop=FALSE]))
+  #p2 <- as.character(predict(fit_single, X[test,,drop=FALSE]))
+  #head(cbind(p1, p2, y_true=y[test]), 20)
 }
