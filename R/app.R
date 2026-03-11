@@ -218,15 +218,48 @@ server <- function(input, output, session) {
                 animate = animationOptions(interval = 800, loop = FALSE))
   })
 
+  # --- Plot Hilfsfkt.
+  add_regression_legend <- function() {
+    par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
+    plot(0, 0, type = "n", bty = "n", xaxt = "n", yaxt = "n")
+    legend("bottom", legend = c("Daten", "Originale Funktion", "Vorhersage", "Splits"),
+           col = c("gray", "gray", "red", "blue"), lty = c(NA, 1, 1, 2),
+           pch = c(19, NA, NA, NA), lwd = c(NA, 2, 2, 1),
+           bg = "white", xpd = TRUE, bty = "n", horiz=TRUE)
+  }
+
+  add_classification_legend <- function(levels_y) {
+    par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
+    plot(0, 0, type = "n", bty = "n", xaxt = "n", yaxt = "n")
+    n_classes <- length(levels_y)
+    pt_colors <- c("red", "blue", "darkgreen")[1:n_classes]
+    legend("bottom", legend = c(paste("Klasse", levels_y), "Entscheidungsrand"),
+           col = c(pt_colors, "black"), pch = c(rep(1, n_classes), NA),
+           lty = c(rep(NA, n_classes), 2), lwd = c(rep(1, n_classes), 2),
+           horiz = TRUE, bty = "n", cex = 1.1)
+  }
+
+  show_message_plot <- function(msg) {
+    plot.new()
+    text(0.5, 0.5, msg, cex = 1.2)
+  }
+
   # --- Plot ---
   output$treePlot <- renderPlot({
     task <- input$task
 
     if (task == "Random Forest") {
-      plot.new()
-      text(0.5, 0.5, paste(task, "ist noch nicht implementiert."), cex = 1.5)
-      return()
+      return(show_message_plot(paste(task, "ist noch nicht implementiert.")))
     }
+
+    # Überprüfe für aufwendige Aufgaben, ob der Button gedrückt wurde
+    if (task %in% c("Cost-Complexity Pruning", "Bagging") && input$run_model == 0) {
+      return(show_message_plot("Bitte Parameter wählen und auf 'Trainieren & Plotten' klicken."))
+    }
+
+    # Stellt orig. Plotparam. am Ende der Funktion wiederher
+    opar <- par(no.readonly = TRUE)
+    on.exit(par(opar))
 
     withProgress(message = 'Erstelle Plot...', detail = 'Vorhersagen werden berechnet', value = 0.5, {
 
@@ -234,125 +267,57 @@ server <- function(input, output, session) {
         dat <- plot_data_greedy()
 
         if (dat$mode == "Regression") {
-          fit <- fit_greedy_cart_regression(dat$X, dat$y,
-                                            max_splits = dat$max_splits,
+          fit <- fit_greedy_cart_regression(dat$X, dat$y, max_splits = dat$max_splits,
                                             min_leaf_size = dat$min_leaf_size,
-                                            min_improve = dat$min_improve,
-                                            print_splits = FALSE)
-          .pardefault <- par(no.readonly = TRUE)
+                                            min_improve = dat$min_improve, print_splits = FALSE)
           par(oma = c(2, 0, 0, 0))
           plot_regression_fit(fit, dat$X, dat$y, "CART (Gieriges Verfahren)", dat$f, TRUE)
+          add_regression_legend()
+
         } else {
-          fit <- fit_greedy_cart_classification(dat$X, dat$y,
-                                                max_splits = dat$max_splits,
+          fit <- fit_greedy_cart_classification(dat$X, dat$y, max_splits = dat$max_splits,
                                                 min_leaf_size = dat$min_leaf_size,
-                                                min_improve = dat$min_improve,
-                                                print_splits = FALSE)
-          .pardefault <- par(no.readonly = TRUE)
+                                                min_improve = dat$min_improve, print_splits = FALSE)
           par(oma = c(3, 0, 0, 0))
           plot_classification_fit(fit, dat$X, dat$y, "CART (Gieriges Verfahren)", dat$f, res = input$plot_res)
+          add_classification_legend(levels(dat$y))
         }
-
-        par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
-        plot(0, 0, type = "n", bty = "n", xaxt = "n", yaxt = "n")
-        if (dat$mode == "Regression") {
-          legend("bottom", legend = c("Daten", "Originale Funktion", "Vorhersage", "Splits"),
-                 col = c("gray", "gray", "red", "blue"), lty = c(NA, 1, 1, 2),
-                 pch = c(19, NA, NA, NA), lwd = c(NA, 2, 2, 1), bg = "white", xpd = TRUE, bty = "n", horiz=TRUE)
-        } else {
-          n_classes <- length(levels(dat$y))
-          pt_colors <- c("red", "blue", "darkgreen")[1:n_classes]
-          legend("bottom", legend = c(paste("Klasse", levels(dat$y)), "Entscheidungsrand"),
-                 col = c(pt_colors, "black"), pch = c(rep(1, n_classes), NA),
-                 lty = c(rep(NA, n_classes), 2), lwd = c(rep(1, n_classes), 2),
-                 horiz = TRUE, bty = "n", cex = 1.1)
-        }
-        par(.pardefault)
 
       } else if (task == "Cost-Complexity Pruning") {
-
-        if (input$run_model == 0) {
-          plot.new()
-          text(0.5, 0.5, "Bitte Parameter wählen und auf 'Trainieren & Plotten' klicken.", cex = 1.2)
-          return()
-        }
-
         res <- pruning_computation()
-        req(res)
-        req(input$lambda_index)
+        req(res, input$lambda_index)
 
-        dat <- res$dat
-        fit <- res$fit
-        pruning_seq <- res$pruning_seq
-
-        idx <- input$lambda_index
-        if (idx > length(pruning_seq$lambdas)) idx <- length(pruning_seq$lambdas)
+        dat <- res$dat; fit <- res$fit; pruning_seq <- res$pruning_seq
+        idx <- min(input$lambda_index, length(pruning_seq$lambdas))
 
         fit_pruned_nodes <- pruning_seq$trees[[idx]]
         lam <- pruning_seq$lambdas[idx]
 
-        # Prüfe ob der Slider-Wert der optimale CV-Wert ist
-        is_cv_optimal <- FALSE
-        if (res$auto_lambda_state && !is.null(res$cv_result)) {
-          optimal_idx <- which.min(abs(res$pruning_seq$lambdas - res$cv_result$best_lambda))
-          if (idx == optimal_idx) {
-            is_cv_optimal <- TRUE
-          }
-        }
+        is_cv_optimal <- res$auto_lambda_state && !is.null(res$cv_result) &&
+          idx == which.min(abs(pruning_seq$lambdas - res$cv_result$best_lambda))
 
-        if (is_cv_optimal) {
-          title_pruned <- sprintf("Gestutzt (CV Optimal, Lambda = %.6f)", lam)
-        } else {
-          title_pruned <- sprintf("Gestutzt (Manuell, Lambda = %.6f)", lam)
-        }
-
-        .pardefault <- par(no.readonly = TRUE)
+        title_pruned <- sprintf("Gestutzt (%s, Lambda = %.6f)",
+                                ifelse(is_cv_optimal, "CV Optimal", "Manuell"), lam)
 
         if (dat$mode == "Regression") {
           par(mfrow = c(1, 2), oma = c(2, 0, 0, 0))
           fit_pruned <- structure(list(nodes = fit_pruned_nodes), class = "greedy_cart_reg")
-
           plot_regression_fit(fit, dat$X, dat$y, "Ungestutzt (Voll ausgewachsen)", dat$f, TRUE)
           plot_regression_fit(fit_pruned, dat$X, dat$y, title_pruned, dat$f, TRUE)
+          add_regression_legend()
 
-          par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
-          plot(0, 0, type = "n", bty = "n", xaxt = "n", yaxt = "n")
-          legend("bottom", legend = c("Daten", "Originale Funktion", "Vorhersage", "Splits"),
-                 col = c("gray", "gray", "red", "blue"), lty = c(NA, 1, 1, 2),
-                 pch = c(19, NA, NA, NA), lwd = c(NA, 2, 2, 1), bg = "white", xpd = TRUE, bty = "n", horiz=TRUE)
-
-        } else { # Klassifikation
+        } else {
           par(mfrow = c(1, 2), oma = c(3, 0, 0, 0))
           fit_pruned <- structure(list(nodes = fit_pruned_nodes, levels = fit$levels), class = "greedy_cart_clas")
-
           plot_classification_fit(fit, dat$X, dat$y, "Ungestutzt (Voll ausgewachsen)", dat$f, res = input$plot_res)
           plot_classification_fit(fit_pruned, dat$X, dat$y, title_pruned, dat$f, res = input$plot_res)
-
-          par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
-          plot(0, 0, type = "n", bty = "n", xaxt = "n", yaxt = "n")
-          n_classes <- length(levels(dat$y))
-          pt_colors <- c("red", "blue", "darkgreen")[1:n_classes]
-          legend("bottom", legend = c(paste("Klasse", levels(dat$y)), "Entscheidungsrand"),
-                 col = c(pt_colors, "black"), pch = c(rep(1, n_classes), NA),
-                 lty = c(rep(NA, n_classes), 2), lwd = c(rep(1, n_classes), 2),
-                 horiz = TRUE, bty = "n", cex = 1.1)
+          add_classification_legend(levels(dat$y))
         }
-        par(.pardefault)
 
       } else if (task == "Bagging") {
-
-        if (input$run_model == 0) {
-          plot.new()
-          text(0.5, 0.5, "Bitte Parameter wählen und auf 'Trainieren & Plotten' klicken.", cex = 1.2)
-          return()
-        }
-
         res <- bagging_computation()
         req(res)
-        dat <- res$dat
-        fit <- res$fit
-
-        .pardefault <- par(no.readonly = TRUE)
+        dat <- res$dat; fit <- res$fit
 
         if (dat$mode == "Regression") {
           par(oma = c(2, 0, 0, 0))
@@ -366,8 +331,7 @@ server <- function(input, output, session) {
 
           X_grid <- data.frame(x = x_grid)
           names(X_grid) <- names(dat$X)
-          y_pred <- predict(fit, X_grid)
-          lines(x_grid, y_pred, col = "red", lwd = 2, type = "s")
+          lines(x_grid, predict(fit, X_grid), col = "red", lwd = 2, type = "s")
 
           par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
           plot(0, 0, type = "n", bty = "n", xaxt = "n", yaxt = "n")
@@ -381,18 +345,8 @@ server <- function(input, output, session) {
           title_bag <- sprintf("Bagging Klassifikation (B = %d, %s)", res$B_trees, meth)
 
           plot_classification_fit(fit, dat$X, dat$y, title_bag, dat$f, res = input$plot_res)
-
-          par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
-          plot(0, 0, type = "n", bty = "n", xaxt = "n", yaxt = "n")
-          n_classes <- length(levels(dat$y))
-          pt_colors <- c("red", "blue", "darkgreen")[1:n_classes]
-          legend("bottom", legend = c(paste("Klasse", levels(dat$y)), "Geglätteter Entscheidungsrand"),
-                 col = c(pt_colors, "black"), pch = c(rep(1, n_classes), NA),
-                 lty = c(rep(NA, n_classes), 2), lwd = c(rep(1, n_classes), 2),
-                 horiz = TRUE, bty = "n", cex = 1.1)
+          add_classification_legend(levels(dat$y))
         }
-
-        par(.pardefault)
       }
     })
   })
