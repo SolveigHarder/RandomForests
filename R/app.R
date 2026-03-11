@@ -13,6 +13,7 @@ source("R/Pruning.R")
 source("R/Bagging_6_25.R")
 source("R/Bagging_6_26.R")
 source("R/Bagging_6_28.R")
+source("R/Rdm_Forest_Algo.R")
 # Plotting
 source("R/Plot_Klassifikation.R")
 source("R/Plot_Regression.R")

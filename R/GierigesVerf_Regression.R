@@ -21,13 +21,21 @@ candidate_splits <- function(xj) {
 # X: n x d (matrix oder df), y: Länge n
 # idx: welche Punkte sind im aktuellen Blatt A(v)
 
-best_split_for_leaf <- function(X, y, idx, min_leaf_size = 1) { #nach Buch
+best_split_for_leaf <- function(X, y, idx, min_leaf_size = 1, mtry = NULL) { #nach Buch
 
 
 
   X <- as.matrix(X)  # sicherheitshalber
   if (is.null(nrow(X))) X <- matrix(X, nrow = 1)
   d <- ncol(X)
+
+
+  # Änderung: für Random Forest Algorithmus nur noch mtry features nutzen
+  feature_set <- if (is.null(mtry) || mtry >= d) {
+    seq_len(d)
+  } else {
+    sample.int(d, size = mtry, replace = FALSE)
+  }
 
   sse_parent <- sse_of_indices(y, idx) #FEHLT
 
@@ -41,7 +49,7 @@ best_split_for_leaf <- function(X, y, idx, min_leaf_size = 1) { #nach Buch
     c2 = NA_real_         # ĉ2(j,s)
   )
 
-  for (j in seq_len(d)) {
+  for (j in feature_set) { #Hier nur noch für alle j in feature set mit Größe mtry machen
 
     xj_all <- X[idx, j]                 # Feature j im Blatt
     s_candidates <- candidate_splits(xj_all)
@@ -115,7 +123,8 @@ fit_greedy_cart_regression <- function(X, y,
                                        max_splits = 10^9, #Buch Abbruch: nur wenn kein Blatt mehr splitbar ist
                                        min_leaf_size = 1,
                                        min_improve = 1e-12,
-                                       print_splits = TRUE) { #nach Buch sonst -infinity?
+                                       print_splits = TRUE, #nach Buch sonst -infinity?
+                                       mtry = NULL) {
 
   X <- as.matrix(X)
   n <- nrow(X)
@@ -150,7 +159,7 @@ fit_greedy_cart_regression <- function(X, y,
       if (length(idx) < 2 * min_leaf_size) next
 
       sse_parent <- sse_of_indices(y, idx)
-      split <- best_split_for_leaf(X, y, idx, min_leaf_size = min_leaf_size)
+      split <- best_split_for_leaf(X, y, idx, min_leaf_size = min_leaf_size, mtry = mtry)
 
       # Falls kein gültiger Split existiert:
       if (is.na(split$j)) next
