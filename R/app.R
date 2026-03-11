@@ -1,18 +1,23 @@
 library(shiny)
 
-# Sicherstellen, dass wir im Projekt-Root sind, nicht im R/ Ordner
+# Die restlichen Skripte nehmen an, dass wir im Projekt-Root sind und nicht im R/ Unterordner.
+# RStudio's "Run App" Button startet allerdings dieses Skript im Unterordner, daher gehe in den Root-Ordner falls nötig.
 if (basename(getwd()) == "R") {
   setwd("..")
 }
 
+# Algorithmen
 source("R/GierigesVerf_Klassifikation.R")
 source("R/GierigesVerf_Regression.R")
 source("R/Pruning.R")
+source("R/Bagging_6_25.R")
+source("R/Bagging_6_26.R")
+source("R/Bagging_6_28.R")
+# Plotting
 source("R/Plot_Klassifikation.R")
 source("R/Plot_Regression.R")
 
 ui <- fluidPage(
-  titlePanel("CART Entscheidungsbäume"),
 
   sidebarLayout(
     sidebarPanel(
@@ -22,6 +27,12 @@ ui <- fluidPage(
       selectInput("mode", "Modus:", choices = c("Regression", "Klassifikation")),
       selectInput("func_type", "Wahre Funktion:", choices = c("Sinus", "Cosinus", "Stufenfunktion")),
       sliderInput("n_samples", "Anzahl Datenpunkte (n):", min = 20, max = 500, value = 150, step = 10),
+
+      # Parameter für Klassifikationen
+      conditionalPanel(
+        condition = "input.mode == 'Klassifikation'",
+        sliderInput("plot_res", "Plot-Auflösung (Rastergröße):", min = 4, max = 250, value = 200, step = 1)
+      ),
 
       # Parameter für Gierige Verfahren
       conditionalPanel(
@@ -42,13 +53,27 @@ ui <- fluidPage(
         sliderInput("cv_folds", "CV Folds (M):", min = 2, max = 10, value = 5, step = 1)
       ),
 
+      # Parameter für Bagging
+      conditionalPanel(
+        condition = "input.task == 'Bagging'",
+        sliderInput("B_trees", "Anzahl Bäume (B):", min = 1, max = 200, value = 50, step = 5),
+        numericInput("bag_max_splits", "Max Splits pro Baum:", value = 30, min = 1),
+        numericInput("bag_min_leaf_size", "Min Leaf Size pro Baum:", value = 3, min = 1),
+
+        conditionalPanel(
+          condition = "input.mode == 'Klassifikation'",
+          selectInput("bag_class_method", "Klassifikations-Methode:",
+                      choices = c("Majority Vote (Def 6.26)", "Probabilities (Def 6.28)"))
+        )
+      ),
+
       # Bei Aufgaben, die länger brauchen, muss mit einem Button bestätigt werden, dass eine neue Berechnung gestartet werden soll.
       conditionalPanel(
         condition = "input.task != 'Gierige Verfahren'",
         hr(),
         actionButton("run_model", "Modell trainieren & Plotten",
                      class = "btn-primary", icon = icon("play")),
-        helpText("Hinweis: Berechnungen können bei vielen Datenpunkten einen Moment dauern.")
+        helpText("Hinweis: Berechnungen können bei vielen Datenpunkten/Bäumen einen Moment dauern.")
       )
     ),
 
@@ -60,6 +85,16 @@ ui <- fluidPage(
 )
 
 server <- function(input, output, session) {
+
+  # Wenn Bagging+Probabilities ausgewählt wird, setze die Auflösung des Plots
+  # automatisch herunter, da die Vorhersagen sonst sehr zeitaufwändig werden.
+  observeEvent(input$bag_class_method, {
+    if (input$task == "Bagging" && input$mode == "Klassifikation") {
+      if (input$bag_class_method == "Probabilities (Def 6.28)") {
+        updateSliderInput(session, "plot_res", value = 35)
+      }
+    }
+  })
 
   generate_data <- function(n, mode, func_type) {
     set.seed(1)
@@ -106,6 +141,7 @@ server <- function(input, output, session) {
   })
 
   pruning_computation <- eventReactive(input$run_model, {
+    req(input$task == "Cost-Complexity Pruning")
     dat <- generate_data(input$n_samples, input$mode, input$func_type)
     is_auto <- input$auto_lambda
 
@@ -132,6 +168,37 @@ server <- function(input, output, session) {
     })
   }, ignoreNULL = TRUE)
 
+  bagging_computation <- eventReactive(input$run_model, {
+    req(input$task == "Bagging")
+    dat <- generate_data(input$n_samples, input$mode, input$func_type)
+
+    saved_B_trees <- input$B_trees
+    saved_bag_class_method <- input$bag_class_method
+
+    withProgress(message = paste('Trainiere Bagging', dat$mode, '...'), value = 0.5, {
+
+      if (dat$mode == "Regression") {
+        fit <- bagging_regression(dat$X, dat$y, B = saved_B_trees,
+                                  max_splits = input$bag_max_splits,
+                                  min_leaf_size = input$bag_min_leaf_size,
+                                  print_splits = FALSE)
+      } else {
+        if (saved_bag_class_method == "Majority Vote (Def 6.26)") {
+          fit <- bagging_classification(dat$X, dat$y, B = saved_B_trees,
+                                        max_splits = input$bag_max_splits,
+                                        min_leaf_size = input$bag_min_leaf_size,
+                                        print_splits = FALSE)
+        } else {
+          fit <- bagging_classification_proba(dat$X, dat$y, B = saved_B_trees,
+                                              max_splits = input$bag_max_splits,
+                                              min_leaf_size = input$bag_min_leaf_size,
+                                              print_splits = FALSE)
+        }
+      }
+
+      list(dat = dat, fit = fit, B_trees = saved_B_trees, class_method = saved_bag_class_method)
+    })
+  }, ignoreNULL = TRUE)
 
   # --- Pruning Schritt Slider ---
   output$lambda_slider_ui <- renderUI({
@@ -140,7 +207,6 @@ server <- function(input, output, session) {
     req(res)
 
     n_lambdas <- length(res$pruning_seq$lambdas)
-
     start_idx <- 1
     if (res$auto_lambda_state && !is.null(res$cv_result)) {
       # Falls CV aktiviert: wähle Index des optimalen Lambdas automatisch aus
@@ -152,128 +218,183 @@ server <- function(input, output, session) {
                 animate = animationOptions(interval = 800, loop = FALSE))
   })
 
-
   # --- Plot ---
   output$treePlot <- renderPlot({
     task <- input$task
 
-    if (task %in% c("Bagging", "Random Forest")) {
+    if (task == "Random Forest") {
       plot.new()
       text(0.5, 0.5, paste(task, "ist noch nicht implementiert."), cex = 1.5)
       return()
     }
 
-    if (task == "Gierige Verfahren") {
-      dat <- plot_data_greedy()
+    withProgress(message = 'Erstelle Plot...', detail = 'Vorhersagen werden berechnet', value = 0.5, {
 
-      if (dat$mode == "Regression") {
-        fit <- fit_greedy_cart_regression(dat$X, dat$y,
-                                          max_splits = dat$max_splits,
-                                          min_leaf_size = dat$min_leaf_size,
-                                          min_improve = dat$min_improve,
-                                          print_splits = FALSE)
-        .pardefault <- par(no.readonly = TRUE)
-        par(oma = c(2, 0, 0, 0))
-        plot_regression_fit(fit, dat$X, dat$y, "CART (Gieriges Verfahren)", dat$f, TRUE)
-      } else {
-        fit <- fit_greedy_cart_classification(dat$X, dat$y,
-                                              max_splits = dat$max_splits,
-                                              min_leaf_size = dat$min_leaf_size,
-                                              min_improve = dat$min_improve,
-                                              print_splits = FALSE)
-        .pardefault <- par(no.readonly = TRUE)
-        par(oma = c(3, 0, 0, 0))
-        plot_classification_fit(fit, dat$X, dat$y, "CART (Gieriges Verfahren)", dat$f)
-      }
+      if (task == "Gierige Verfahren") {
+        dat <- plot_data_greedy()
 
-      par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
-      plot(0, 0, type = "n", bty = "n", xaxt = "n", yaxt = "n")
-      if (dat$mode == "Regression") {
-        legend("bottom", legend = c("Daten", "Originale Funktion", "Vorhersage", "Splits"),
-               col = c("gray", "gray", "red", "blue"), lty = c(NA, 1, 1, 2),
-               pch = c(19, NA, NA, NA), lwd = c(NA, 2, 2, 1), bg = "white", xpd = TRUE, bty = "n", horiz=TRUE)
-      } else {
-        n_classes <- length(levels(dat$y))
-        pt_colors <- c("red", "blue", "darkgreen")[1:n_classes]
-        legend("bottom", legend = c(paste("Klasse", levels(dat$y)), "Entscheidungsrand"),
-               col = c(pt_colors, "black"), pch = c(rep(1, n_classes), NA),
-               lty = c(rep(NA, n_classes), 2), lwd = c(rep(1, n_classes), 2),
-               horiz = TRUE, bty = "n", cex = 1.1)
-      }
-      par(.pardefault)
-
-    } else if (task == "Cost-Complexity Pruning") {
-
-      if (input$run_model == 0) {
-        plot.new()
-        text(0.5, 0.5, "Bitte Parameter wählen und auf 'Trainieren & Plotten' klicken.", cex = 1.2)
-        return()
-      }
-
-      res <- pruning_computation()
-      req(res)
-      req(input$lambda_index) # Warte bis der Slider bereit ist
-
-      dat <- res$dat
-      fit <- res$fit
-      pruning_seq <- res$pruning_seq
-
-      idx <- input$lambda_index
-      if (idx > length(pruning_seq$lambdas)) idx <- length(pruning_seq$lambdas)
-
-      fit_pruned_nodes <- pruning_seq$trees[[idx]]
-      lam <- pruning_seq$lambdas[idx]
-
-      # Prüfe ob der Slider-Wert der optimale CV-Wert ist
-      is_cv_optimal <- FALSE
-      if (res$auto_lambda_state && !is.null(res$cv_result)) {
-        optimal_idx <- which.min(abs(res$pruning_seq$lambdas - res$cv_result$best_lambda))
-        if (idx == optimal_idx) {
-          is_cv_optimal <- TRUE
+        if (dat$mode == "Regression") {
+          fit <- fit_greedy_cart_regression(dat$X, dat$y,
+                                            max_splits = dat$max_splits,
+                                            min_leaf_size = dat$min_leaf_size,
+                                            min_improve = dat$min_improve,
+                                            print_splits = FALSE)
+          .pardefault <- par(no.readonly = TRUE)
+          par(oma = c(2, 0, 0, 0))
+          plot_regression_fit(fit, dat$X, dat$y, "CART (Gieriges Verfahren)", dat$f, TRUE)
+        } else {
+          fit <- fit_greedy_cart_classification(dat$X, dat$y,
+                                                max_splits = dat$max_splits,
+                                                min_leaf_size = dat$min_leaf_size,
+                                                min_improve = dat$min_improve,
+                                                print_splits = FALSE)
+          .pardefault <- par(no.readonly = TRUE)
+          par(oma = c(3, 0, 0, 0))
+          plot_classification_fit(fit, dat$X, dat$y, "CART (Gieriges Verfahren)", dat$f, res = input$plot_res)
         }
-      }
-
-      if (is_cv_optimal) {
-        title_pruned <- sprintf("Gestutzt (CV Optimal, Lambda = %.3f)", lam)
-      } else {
-        title_pruned <- sprintf("Gestutzt (Manuell, Lambda = %.3f)", lam)
-      }
-
-      # Layout vorbereiten
-      .pardefault <- par(no.readonly = TRUE)
-
-      if (dat$mode == "Regression") {
-        par(mfrow = c(1, 2), oma = c(2, 0, 0, 0))
-        fit_pruned <- structure(list(nodes = fit_pruned_nodes), class = "greedy_cart_reg")
-
-        plot_regression_fit(fit, dat$X, dat$y, "Ungestutzt (Voll ausgewachsen)", dat$f, TRUE)
-        plot_regression_fit(fit_pruned, dat$X, dat$y, title_pruned, dat$f, TRUE)
 
         par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
         plot(0, 0, type = "n", bty = "n", xaxt = "n", yaxt = "n")
-        legend("bottom", legend = c("Daten", "Originale Funktion", "Vorhersage", "Splits"),
-               col = c("gray", "gray", "red", "blue"), lty = c(NA, 1, 1, 2),
-               pch = c(19, NA, NA, NA), lwd = c(NA, 2, 2, 1), bg = "white", xpd = TRUE, bty = "n", horiz=TRUE)
+        if (dat$mode == "Regression") {
+          legend("bottom", legend = c("Daten", "Originale Funktion", "Vorhersage", "Splits"),
+                 col = c("gray", "gray", "red", "blue"), lty = c(NA, 1, 1, 2),
+                 pch = c(19, NA, NA, NA), lwd = c(NA, 2, 2, 1), bg = "white", xpd = TRUE, bty = "n", horiz=TRUE)
+        } else {
+          n_classes <- length(levels(dat$y))
+          pt_colors <- c("red", "blue", "darkgreen")[1:n_classes]
+          legend("bottom", legend = c(paste("Klasse", levels(dat$y)), "Entscheidungsrand"),
+                 col = c(pt_colors, "black"), pch = c(rep(1, n_classes), NA),
+                 lty = c(rep(NA, n_classes), 2), lwd = c(rep(1, n_classes), 2),
+                 horiz = TRUE, bty = "n", cex = 1.1)
+        }
+        par(.pardefault)
 
-      } else { # Klassifikation
-        par(mfrow = c(1, 2), oma = c(3, 0, 0, 0))
-        fit_pruned <- structure(list(nodes = fit_pruned_nodes, levels = fit$levels), class = "greedy_cart_clas")
+      } else if (task == "Cost-Complexity Pruning") {
 
-        plot_classification_fit(fit, dat$X, dat$y, "Ungestutzt (Voll ausgewachsen)", dat$f)
-        plot_classification_fit(fit_pruned, dat$X, dat$y, title_pruned, dat$f)
+        if (input$run_model == 0) {
+          plot.new()
+          text(0.5, 0.5, "Bitte Parameter wählen und auf 'Trainieren & Plotten' klicken.", cex = 1.2)
+          return()
+        }
 
-        par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
-        plot(0, 0, type = "n", bty = "n", xaxt = "n", yaxt = "n")
-        n_classes <- length(levels(dat$y))
-        pt_colors <- c("red", "blue", "darkgreen")[1:n_classes]
-        legend("bottom", legend = c(paste("Klasse", levels(dat$y)), "Entscheidungsrand"),
-               col = c(pt_colors, "black"), pch = c(rep(1, n_classes), NA),
-               lty = c(rep(NA, n_classes), 2), lwd = c(rep(1, n_classes), 2),
-               horiz = TRUE, bty = "n", cex = 1.1)
+        res <- pruning_computation()
+        req(res)
+        req(input$lambda_index)
+
+        dat <- res$dat
+        fit <- res$fit
+        pruning_seq <- res$pruning_seq
+
+        idx <- input$lambda_index
+        if (idx > length(pruning_seq$lambdas)) idx <- length(pruning_seq$lambdas)
+
+        fit_pruned_nodes <- pruning_seq$trees[[idx]]
+        lam <- pruning_seq$lambdas[idx]
+
+        # Prüfe ob der Slider-Wert der optimale CV-Wert ist
+        is_cv_optimal <- FALSE
+        if (res$auto_lambda_state && !is.null(res$cv_result)) {
+          optimal_idx <- which.min(abs(res$pruning_seq$lambdas - res$cv_result$best_lambda))
+          if (idx == optimal_idx) {
+            is_cv_optimal <- TRUE
+          }
+        }
+
+        if (is_cv_optimal) {
+          title_pruned <- sprintf("Gestutzt (CV Optimal, Lambda = %.6f)", lam)
+        } else {
+          title_pruned <- sprintf("Gestutzt (Manuell, Lambda = %.6f)", lam)
+        }
+
+        .pardefault <- par(no.readonly = TRUE)
+
+        if (dat$mode == "Regression") {
+          par(mfrow = c(1, 2), oma = c(2, 0, 0, 0))
+          fit_pruned <- structure(list(nodes = fit_pruned_nodes), class = "greedy_cart_reg")
+
+          plot_regression_fit(fit, dat$X, dat$y, "Ungestutzt (Voll ausgewachsen)", dat$f, TRUE)
+          plot_regression_fit(fit_pruned, dat$X, dat$y, title_pruned, dat$f, TRUE)
+
+          par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
+          plot(0, 0, type = "n", bty = "n", xaxt = "n", yaxt = "n")
+          legend("bottom", legend = c("Daten", "Originale Funktion", "Vorhersage", "Splits"),
+                 col = c("gray", "gray", "red", "blue"), lty = c(NA, 1, 1, 2),
+                 pch = c(19, NA, NA, NA), lwd = c(NA, 2, 2, 1), bg = "white", xpd = TRUE, bty = "n", horiz=TRUE)
+
+        } else { # Klassifikation
+          par(mfrow = c(1, 2), oma = c(3, 0, 0, 0))
+          fit_pruned <- structure(list(nodes = fit_pruned_nodes, levels = fit$levels), class = "greedy_cart_clas")
+
+          plot_classification_fit(fit, dat$X, dat$y, "Ungestutzt (Voll ausgewachsen)", dat$f, res = input$plot_res)
+          plot_classification_fit(fit_pruned, dat$X, dat$y, title_pruned, dat$f, res = input$plot_res)
+
+          par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
+          plot(0, 0, type = "n", bty = "n", xaxt = "n", yaxt = "n")
+          n_classes <- length(levels(dat$y))
+          pt_colors <- c("red", "blue", "darkgreen")[1:n_classes]
+          legend("bottom", legend = c(paste("Klasse", levels(dat$y)), "Entscheidungsrand"),
+                 col = c(pt_colors, "black"), pch = c(rep(1, n_classes), NA),
+                 lty = c(rep(NA, n_classes), 2), lwd = c(rep(1, n_classes), 2),
+                 horiz = TRUE, bty = "n", cex = 1.1)
+        }
+        par(.pardefault)
+
+      } else if (task == "Bagging") {
+
+        if (input$run_model == 0) {
+          plot.new()
+          text(0.5, 0.5, "Bitte Parameter wählen und auf 'Trainieren & Plotten' klicken.", cex = 1.2)
+          return()
+        }
+
+        res <- bagging_computation()
+        req(res)
+        dat <- res$dat
+        fit <- res$fit
+
+        .pardefault <- par(no.readonly = TRUE)
+
+        if (dat$mode == "Regression") {
+          par(oma = c(2, 0, 0, 0))
+          title_bag <- sprintf("Bagging Regression (B = %d Bäume)", res$B_trees)
+
+          x_vals <- dat$X[[1]]
+          plot(x_vals, dat$y, main = title_bag, xlab = "x", ylab = "y", pch = 19, col = "gray", cex = 0.8)
+
+          x_grid <- seq(min(x_vals), max(x_vals), length.out = 2000)
+          lines(x_grid, dat$f(x_grid), col = "gray", lwd = 2)
+
+          X_grid <- data.frame(x = x_grid)
+          names(X_grid) <- names(dat$X)
+          y_pred <- predict(fit, X_grid)
+          lines(x_grid, y_pred, col = "red", lwd = 2, type = "s")
+
+          par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
+          plot(0, 0, type = "n", bty = "n", xaxt = "n", yaxt = "n")
+          legend("bottom", legend = c("Daten", "Originale Funktion", "Aggregierte Vorhersage"),
+                 col = c("gray", "gray", "red"), lty = c(NA, 1, 1),
+                 pch = c(19, NA, NA), lwd = c(NA, 2, 2), bg = "white", xpd = TRUE, bty = "n", horiz=TRUE)
+
+        } else {
+          par(oma = c(3, 0, 0, 0))
+          meth <- ifelse(res$class_method == "Majority Vote (Def 6.26)", "Majority", "Proba")
+          title_bag <- sprintf("Bagging Klassifikation (B = %d, %s)", res$B_trees, meth)
+
+          plot_classification_fit(fit, dat$X, dat$y, title_bag, dat$f, res = input$plot_res)
+
+          par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
+          plot(0, 0, type = "n", bty = "n", xaxt = "n", yaxt = "n")
+          n_classes <- length(levels(dat$y))
+          pt_colors <- c("red", "blue", "darkgreen")[1:n_classes]
+          legend("bottom", legend = c(paste("Klasse", levels(dat$y)), "Geglätteter Entscheidungsrand"),
+                 col = c(pt_colors, "black"), pch = c(rep(1, n_classes), NA),
+                 lty = c(rep(NA, n_classes), 2), lwd = c(rep(1, n_classes), 2),
+                 horiz = TRUE, bty = "n", cex = 1.1)
+        }
+
+        par(.pardefault)
       }
-
-      par(.pardefault)
-    }
+    })
   })
 }
 

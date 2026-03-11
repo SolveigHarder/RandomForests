@@ -69,9 +69,6 @@ plot_using_scatter_function <- function(title, min_x = -1, max_x = 1,
   # Pruning
   pruning_seq <- cost_complexity_sequence(fit$nodes, y, "regression")
 
-  # TODO: als Parameter in der Shiny-App implementieren; überschreibt CV-Algo
-  # target_idx <- max(1, length(pruning_seq$trees) - 50)
-
   cv_result <- cv_optimal_lambda(X, y, fit, pruning_seq, mode = "regression", M = 5, max_splits = 10^12)
   best_lambda <- cv_result$best_lambda
   best_tree_nodes <- cv_result$best_tree

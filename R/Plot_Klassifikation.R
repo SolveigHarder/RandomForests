@@ -5,7 +5,7 @@ source("R/Pruning.R")
 .pardefault <- par(no.readonly = TRUE)
 
 # Funktion zum Plotten eines einzelnen Klassifikationsbaums (2D)
-plot_classification_fit <- function(tree, X, y, title, input_func = NULL) {
+plot_classification_fit <- function(tree, X, y, title, input_func = NULL, res = 200) {
   stopifnot("Eingabe für Klassifikationsplot muss 2D sein" = ncol(X) == 2)
 
   y <- as.factor(y)
@@ -21,7 +21,6 @@ plot_classification_fit <- function(tree, X, y, title, input_func = NULL) {
   x2_lim <- c(min(x2_vals), max(x2_vals))
 
   # Dichtes Raster für die farbigen Hinterlegungen (Entscheidungsregel) erstellen
-  res <- 200
   x1_grid <- seq(x1_lim[1], x1_lim[2], length.out = res)
   x2_grid <- seq(x2_lim[1], x2_lim[2], length.out = res)
 
@@ -54,10 +53,6 @@ plot_classification_fit <- function(tree, X, y, title, input_func = NULL) {
 
 
 plot_classification_comparison <- function(fit, pruning_seq, X, y, title, input_func) {
-
-  # TODO: als Parameter in der Shiny-App implementieren; überschreibt CV-Algo
-  # target_idx <- max(1, length(pruning_seq$trees) - 50)
-
   cv_result <- cv_optimal_lambda(X, y, fit, pruning_seq, mode = "classification", M = 5, max_splits = 10^12)
   best_lambda <- cv_result$best_lambda
   best_tree_nodes <- cv_result$best_tree
@@ -91,7 +86,7 @@ plot_classification_comparison <- function(fit, pruning_seq, X, y, title, input_
 }
 
 # Generiere Daten mit Input-Funktion und plotte
-plot_using_scatter_function <- function(title, min_x, max_x, input_func) {
+plot_classification_using_scatter_function <- function(title, min_x, max_x, input_func) {
   set.seed(42)
   n <- 200
 
@@ -128,7 +123,7 @@ plot_using_scatter_function <- function(title, min_x, max_x, input_func) {
   print("Done")
 }
 
-#plot_using_scatter_function(
+#plot_classification_using_scatter_function(
 #  "Klassifikation",
 #  input_func = function(x) {
 #    ifelse(x < -0.2, 1,
@@ -138,7 +133,7 @@ plot_using_scatter_function <- function(title, min_x, max_x, input_func) {
 #  max_x = 1
 #)
 
-#plot_using_scatter_function(
+#plot_classification_using_scatter_function(
 #  "Klassifikation - Sinus",
 #  min_x = -pi,
 #  max_x = pi,
