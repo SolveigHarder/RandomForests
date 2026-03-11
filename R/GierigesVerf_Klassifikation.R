@@ -37,7 +37,7 @@ candidate_splits <- function(xj) {
 # X: n x d (matrix oder df), y: Länge n
 # idx: welche Punkte sind im aktuellen Blatt A(v)
 
-best_split_for_leaf <- function(X, y, idx, min_leaf_size = 1) { #nach Buch
+best_split_for_leaf_class <- function(X, y, idx, min_leaf_size = 1) { #nach Buch
 
   X <- as.matrix(X)  # sicherheitshalber
   if (is.null(nrow(X))) X <- matrix(X, nrow = 1)
@@ -169,7 +169,7 @@ fit_greedy_cart_classification <- function(X, y,
       if (length(idx) < 2 * min_leaf_size) next
 
       parent_err <- misclass_of_indices(y, idx) ###für Klassifikation
-      split <- best_split_for_leaf(X, y, idx, min_leaf_size = min_leaf_size)
+      split <- best_split_for_leaf_class(X, y, idx, min_leaf_size = min_leaf_size)
 
       # Falls kein gültiger Split existiert:
       if (is.na(split$j)) next

@@ -1,6 +1,6 @@
 Package: RandomForests
 Type: Package
-Title: What the Package Does (Title Case)
+Title: Regression und Klassifikation mit CART-Entscheidungsbäumen, Random Forests 
 Version: 0.1.0
 Authors@R: c(
     person(
@@ -14,3 +14,4 @@ Description: More about what it does (maybe more than one line).
 License: What license is it under?
 Encoding: UTF-8
 LazyData: true
+Imports: shiny
