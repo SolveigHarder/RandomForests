@@ -138,9 +138,9 @@ plot_using_scatter_function <- function(title, min_x, max_x, input_func) {
 #  max_x = 1
 #)
 
-plot_using_scatter_function(
-  "Klassifikation - Sinus",
-  min_x = -pi,
-  max_x = pi,
-  input_func = function(x) { sin(x) }
-)
+#plot_using_scatter_function(
+#  "Klassifikation - Sinus",
+#  min_x = -pi,
+#  max_x = pi,
+#  input_func = function(x) { sin(x) }
+#)

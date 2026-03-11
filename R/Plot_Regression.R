@@ -117,10 +117,10 @@ set.seed(1)
 #  show_original_func = FALSE
 #)
 
-plot_using_scatter_function(
-  "Regression - Cosinus",
-  min_x = -pi,
-  max_x = pi,
-  input_func = function(x) { cos(x) }
-)
+#plot_using_scatter_function(
+#  "Regression - Cosinus",
+#  min_x = -pi,
+#  max_x = pi,
+#  input_func = function(x) { cos(x) }
+#)
 
