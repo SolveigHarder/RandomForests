@@ -28,6 +28,7 @@ ui <- fluidPage(
       selectInput("mode", "Modus:", choices = c("Regression", "Klassifikation")),
       selectInput("func_type", "Wahre Funktion:", choices = c("Sinus", "Cosinus", "Stufenfunktion")),
       sliderInput("n_samples", "Anzahl Datenpunkte (n):", min = 20, max = 500, value = 150, step = 10),
+      checkboxInput("add_noise", "Rauschen hinzufügen", value = TRUE),
 
       # Parameter für Klassifikationen
       conditionalPanel(
@@ -116,7 +117,7 @@ server <- function(input, output, session) {
     }
   })
 
-  generate_data <- function(n, mode, func_type) {
+  generate_data <- function(n, mode, func_type, add_noise) {
     set.seed(1)
 
     if (func_type == "Sinus") {
@@ -132,7 +133,10 @@ server <- function(input, output, session) {
 
     if (mode == "Regression") {
       x <- sort(runif(n, min_x, max_x))
-      y <- f(x) + rnorm(n, sd = 0.2)
+      y <- f(x)
+      if (add_noise) {
+        y <- y + rnorm(n, sd = 0.2)
+      }
       X <- data.frame(x = x)
     } else {
       grid_vals <- f(seq(min_x, max_x, length.out = 1000))
@@ -144,8 +148,10 @@ server <- function(input, output, session) {
       X <- data.frame(X1 = X1, X2 = X2)
 
       y_true <- ifelse(X2 < f(X1), 1, 2)
-      flip <- runif(n) < 0.07
-      y_true[flip] <- ifelse(y_true[flip] == 1, 2, 1)
+      if (add_noise) {
+        flip <- runif(n) < 0.07
+        y_true[flip] <- ifelse(y_true[flip] == 1, 2, 1)
+      }
       y <- as.factor(y_true)
     }
 
@@ -153,7 +159,7 @@ server <- function(input, output, session) {
   }
 
   plot_data_greedy <- reactive({
-    dat <- generate_data(input$n_samples, input$mode, input$func_type)
+    dat <- generate_data(input$n_samples, input$mode, input$func_type, input$add_noise)
     dat$max_splits <- input$max_splits
     dat$min_leaf_size <- input$min_leaf_size
     dat$min_improve <- input$min_improve
@@ -162,7 +168,7 @@ server <- function(input, output, session) {
 
   pruning_computation <- eventReactive(input$run_model, {
     req(input$task == "Cost-Complexity Pruning")
-    dat <- generate_data(input$n_samples, input$mode, input$func_type)
+    dat <- generate_data(input$n_samples, input$mode, input$func_type, input$add_noise)
     is_auto <- input$auto_lambda
 
     withProgress(message = paste('Berechne', dat$mode, '...'), value = 0, {
@@ -190,7 +196,7 @@ server <- function(input, output, session) {
 
   bagging_computation <- eventReactive(input$run_model, {
     req(input$task == "Bagging")
-    dat <- generate_data(input$n_samples, input$mode, input$func_type)
+    dat <- generate_data(input$n_samples, input$mode, input$func_type, input$add_noise)
 
     saved_B_trees <- input$B_trees
     saved_bag_class_method <- input$bag_class_method
@@ -222,7 +228,7 @@ server <- function(input, output, session) {
 
   rf_computation <- eventReactive(input$run_model, {
     req(input$task == "Random Forest")
-    dat <- generate_data(input$n_samples, input$mode, input$func_type)
+    dat <- generate_data(input$n_samples, input$mode, input$func_type, input$add_noise)
 
     saved_B_trees <- input$rf_B_trees
     saved_mtry <- input$rf_mtry
@@ -246,7 +252,7 @@ server <- function(input, output, session) {
     })
   }, ignoreNULL = TRUE)
 
- # --- Pruning Schritt Slider ---
+  # --- Pruning Schritt Slider ---
   output$lambda_slider_ui <- renderUI({
     req(input$task == "Cost-Complexity Pruning")
     res <- pruning_computation()
