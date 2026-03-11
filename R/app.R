@@ -19,7 +19,7 @@ source("R/Plot_Klassifikation.R")
 source("R/Plot_Regression.R")
 
 ui <- fluidPage(
-
+  br(),
   sidebarLayout(
     sidebarPanel(
       selectInput("task", "Aufgabe:",
@@ -68,13 +68,27 @@ ui <- fluidPage(
         )
       ),
 
-      # Bei Aufgaben, die länger brauchen, muss mit einem Button bestätigt werden, dass eine neue Berechnung gestartet werden soll.
+      # Parameter für Random Forest
+      conditionalPanel(
+        condition = "input.task == 'Random Forest'",
+        sliderInput("rf_B_trees", "Anzahl Bäume (B):", min = 1, max = 200, value = 50, step = 5),
+        numericInput("rf_mtry", "mtry (Features pro Split):", value = 1, min = 1),
+        uiOutput("rf_An_ui"),
+        numericInput("rf_max_splits", "Max Splits pro Baum:", value = 30, min = 1),
+        numericInput("rf_min_leaf_size", "Min Leaf Size pro Baum:", value = 3, min = 1)
+      ),
+
+      conditionalPanel(
+        condition = "(input.task == 'Random Forest' || input.task == 'Bagging') && input.mode == 'Regression'",
+        checkboxInput("show_individual", "Einzelbäume anzeigen (erste 25)", value = FALSE)
+      ),
+
       conditionalPanel(
         condition = "input.task != 'Gierige Verfahren'",
         hr(),
-        actionButton("run_model", "Modell trainieren & Plotten",
+        actionButton("run_model", "Berechnen & Plotten",
                      class = "btn-primary", icon = icon("play")),
-        helpText("Hinweis: Berechnungen können bei vielen Datenpunkten/Bäumen einen Moment dauern.")
+        helpText("Hinweis: Berechnungen können bei vielen Datenpunkten/Bäumen eine Weile dauern.")
       )
     ),
 
@@ -86,6 +100,11 @@ ui <- fluidPage(
 )
 
 server <- function(input, output, session) {
+
+  output$rf_An_ui <- renderUI({
+    numericInput("rf_A_n", "A_n (Bootstrap Sample-Größe):",
+                 value = input$n_samples, min = 1, max = input$n_samples)
+  })
 
   # Wenn Bagging+Probabilities ausgewählt wird, setze die Auflösung des Plots
   # automatisch herunter, da die Vorhersagen sonst sehr zeitaufwändig werden.
@@ -146,7 +165,7 @@ server <- function(input, output, session) {
     dat <- generate_data(input$n_samples, input$mode, input$func_type)
     is_auto <- input$auto_lambda
 
-    withProgress(message = paste('Trainiere', dat$mode, 'smodell...'), value = 0, {
+    withProgress(message = paste('Berechne', dat$mode, '...'), value = 0, {
       incProgress(0.2, detail = "Vollständiger Baum wird erzeugt...")
 
       if (dat$mode == "Regression") {
@@ -176,7 +195,7 @@ server <- function(input, output, session) {
     saved_B_trees <- input$B_trees
     saved_bag_class_method <- input$bag_class_method
 
-    withProgress(message = paste('Trainiere Bagging', dat$mode, '...'), value = 0.5, {
+    withProgress(message = paste('Berechne Bagging', dat$mode, '...'), value = 0.5, {
 
       if (dat$mode == "Regression") {
         fit <- bagging_regression(dat$X, dat$y, B = saved_B_trees,
@@ -197,11 +216,37 @@ server <- function(input, output, session) {
         }
       }
 
-      list(dat = dat, fit = fit, B_trees = saved_B_trees, class_method = saved_bag_class_method)
+      list(dat = dat, fit = fit, B_trees = saved_B_trees, class_method = saved_bag_class_method, show_individual = input$show_individual)
     })
   }, ignoreNULL = TRUE)
 
-  # --- Pruning Schritt Slider ---
+  rf_computation <- eventReactive(input$run_model, {
+    req(input$task == "Random Forest")
+    dat <- generate_data(input$n_samples, input$mode, input$func_type)
+
+    saved_B_trees <- input$rf_B_trees
+    saved_mtry <- input$rf_mtry
+    saved_A_n <- input$rf_A_n
+
+    d <- ncol(dat$X)
+    if (saved_mtry > d) saved_mtry <- d
+    if (is.null(saved_A_n) || saved_A_n > input$n_samples) saved_A_n <- input$n_samples
+
+    withProgress(message = paste('Berechne Random Forest', dat$mode, '...'), value = 0.5, {
+      if (dat$mode == "Regression") {
+        fit <- random_forest_regression(dat$X, dat$y, B = saved_B_trees,
+                                        mtry = saved_mtry, A_n = saved_A_n,
+                                        max_splits = input$rf_max_splits,
+                                        min_leaf_size = input$rf_min_leaf_size,
+                                        print_splits = FALSE)
+        list(dat = dat, fit = fit, B_trees = saved_B_trees, mtry = saved_mtry, A_n = saved_A_n, show_individual = input$show_individual)
+      } else {
+        NULL
+      }
+    })
+  }, ignoreNULL = TRUE)
+
+ # --- Pruning Schritt Slider ---
   output$lambda_slider_ui <- renderUI({
     req(input$task == "Cost-Complexity Pruning")
     res <- pruning_computation()
@@ -214,12 +259,45 @@ server <- function(input, output, session) {
       start_idx <- which.min(abs(res$pruning_seq$lambdas - res$cv_result$best_lambda))
     }
 
-    sliderInput("lambda_index", "Wähle Pruning-Schritt (1 = ungestutzt, höhere Werte = stärker gestutzt):",
+    sliderInput("lambda_index", "Wähle Pruning-Schritt (1 = ungestutzt):",
                 min = 1, max = n_lambdas, value = start_idx, step = 1, width = "100%",
                 animate = animationOptions(interval = 800, loop = FALSE))
   })
 
   # --- Plot Hilfsfkt.
+  plot_multi_tree_regression <- function(fit, dat, title_text, show_individual) {
+    par(oma = c(2, 0, 0, 0))
+    x_vals <- dat$X[[1]]
+    plot(x_vals, dat$y, main = title_text, xlab = "x", ylab = "y", pch = 19, col = "gray", cex = 0.8)
+
+    x_grid <- seq(min(x_vals), max(x_vals), length.out = 2000)
+    lines(x_grid, dat$f(x_grid), col = "gray", lwd = 2)
+
+    X_grid <- data.frame(x = x_grid)
+    names(X_grid) <- names(dat$X)
+
+    # Max. 25 Einzelbäume -> weniger Rechenaufwand & übersichtlicher
+    if (show_individual) {
+        n_trees_to_plot <- min(fit$B, 25)
+        for (b in 1:n_trees_to_plot) {
+          tree_fit <- fit$trees[[b]]
+          tree_preds <- predict(tree_fit, X_grid)
+          lines(x_grid, tree_preds, col = rgb(0.2, 0.5, 0.8, alpha = 0.25), lwd = 1, type = "s")
+        }
+    }
+
+    lines(x_grid, predict(fit, X_grid), col = "red", lwd = 2.5, type = "s")
+
+    par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
+    plot(0, 0, type = "n", bty = "n", xaxt = "n", yaxt = "n")
+    legend("bottom", legend = c("Daten", "Originale Funktion", "Einzelbäume", "Ensemble Vorhersage"),
+           col = c("gray", "gray", rgb(0.2, 0.5, 0.8, alpha = 0.6), "red"),
+           lty = c(NA, 1, 1, 1),
+           pch = c(19, NA, NA, NA),
+           lwd = c(NA, 2, 1, 2.5),
+           bg = "white", xpd = TRUE, bty = "n", horiz=TRUE)
+  }
+
   add_regression_legend <- function() {
     par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
     plot(0, 0, type = "n", bty = "n", xaxt = "n", yaxt = "n")
@@ -249,13 +327,8 @@ server <- function(input, output, session) {
   output$treePlot <- renderPlot({
     task <- input$task
 
-    if (task == "Random Forest") {
-      return(show_message_plot(paste(task, "ist noch nicht implementiert.")))
-    }
-
-    # Überprüfe für aufwendige Aufgaben, ob der Button gedrückt wurde
-    if (task %in% c("Cost-Complexity Pruning", "Bagging") && input$run_model == 0) {
-      return(show_message_plot("Bitte Parameter wählen und auf 'Trainieren & Plotten' klicken."))
+    if (task %in% c("Cost-Complexity Pruning", "Bagging", "Random Forest") && input$run_model == 0) {
+      return(show_message_plot("Bitte Parameter wählen und auf 'Berechnen & Plotten' klicken."))
     }
 
     # Stellt orig. Plotparam. am Ende der Funktion wiederher
@@ -321,24 +394,8 @@ server <- function(input, output, session) {
         dat <- res$dat; fit <- res$fit
 
         if (dat$mode == "Regression") {
-          par(oma = c(2, 0, 0, 0))
           title_bag <- sprintf("Bagging Regression (B = %d Bäume)", res$B_trees)
-
-          x_vals <- dat$X[[1]]
-          plot(x_vals, dat$y, main = title_bag, xlab = "x", ylab = "y", pch = 19, col = "gray", cex = 0.8)
-
-          x_grid <- seq(min(x_vals), max(x_vals), length.out = 2000)
-          lines(x_grid, dat$f(x_grid), col = "gray", lwd = 2)
-
-          X_grid <- data.frame(x = x_grid)
-          names(X_grid) <- names(dat$X)
-          lines(x_grid, predict(fit, X_grid), col = "red", lwd = 2, type = "s")
-
-          par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
-          plot(0, 0, type = "n", bty = "n", xaxt = "n", yaxt = "n")
-          legend("bottom", legend = c("Daten", "Originale Funktion", "Aggregierte Vorhersage"),
-                 col = c("gray", "gray", "red"), lty = c(NA, 1, 1),
-                 pch = c(19, NA, NA), lwd = c(NA, 2, 2), bg = "white", xpd = TRUE, bty = "n", horiz=TRUE)
+          plot_multi_tree_regression(fit, dat, title_bag, res$show_individual)
 
         } else {
           par(oma = c(3, 0, 0, 0))
@@ -348,6 +405,20 @@ server <- function(input, output, session) {
           plot_classification_fit(fit, dat$X, dat$y, title_bag, dat$f, res = input$plot_res)
           add_classification_legend(levels(dat$y))
         }
+
+      } else if (task == "Random Forest") {
+
+        if (input$mode == "Klassifikation") {
+          return(show_message_plot("TODO: Nicht implementiert"))
+        }
+
+        res <- rf_computation()
+        req(res)
+
+        title_rf <- sprintf("Random Forest Regression (B = %d, mtry = %d, A_n = %d)",
+                            res$B_trees, res$mtry, res$A_n)
+        plot_multi_tree_regression(res$fit, res$dat, title_rf, res$show_individual)
+
       }
     })
   })
