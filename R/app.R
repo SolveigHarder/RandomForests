@@ -58,7 +58,7 @@ ui <- fluidPage(
       # Parameter für Cost-Complexity Pruning
       conditionalPanel(
         condition = "input.task == 'Cost-Complexity Pruning'",
-        checkboxInput("auto_lambda", "Automatische Lambda-Bestimmung (CV)", value = TRUE)
+        checkboxInput("auto_lambda", "Automatische Lambda-Bestimmung (CV)", value = FALSE)
       ),
 
       conditionalPanel(
