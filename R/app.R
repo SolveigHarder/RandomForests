@@ -26,9 +26,20 @@ ui <- fluidPage(
                   choices = c("Gierige Verfahren", "Cost-Complexity Pruning", "Bagging", "Random Forest")),
 
       selectInput("mode", "Modus:", choices = c("Regression", "Klassifikation")),
-      selectInput("func_type", "Wahre Funktion:", choices = c("Sinus", "Cosinus", "Stufenfunktion")),
-      sliderInput("n_samples", "Anzahl Datenpunkte (n):", min = 20, max = 500, value = 150, step = 10),
-      checkboxInput("add_noise", "Rauschen hinzufügen", value = TRUE),
+      uiOutput("func_select_ui"),
+
+      # Feature-Auswahl für Iris
+      conditionalPanel(
+        condition = "input.func_type == 'Iris-Datensatz'",
+        selectInput("iris_x", "Feature X-Achse:", choices = names(iris)[1:4], selected = "Sepal.Length"),
+        selectInput("iris_y", "Feature Y-Achse:", choices = names(iris)[1:4], selected = "Petal.Length")
+      ),
+
+      conditionalPanel(
+        condition = "input.func_type != 'Iris-Datensatz'",
+        sliderInput("n_samples", "Anzahl Datenpunkte (n):", min = 20, max = 500, value = 150, step = 10),
+        checkboxInput("add_noise", "Rauschen hinzufügen", value = TRUE)
+      ),
 
       # Parameter für Klassifikationen
       conditionalPanel(
@@ -102,6 +113,14 @@ ui <- fluidPage(
 
 server <- function(input, output, session) {
 
+  output$func_select_ui <- renderUI({
+    choices <- c("Sinus", "Cosinus", "Stufenfunktion")
+    if (input$mode == "Klassifikation") {
+      choices <- c(choices, "Iris-Datensatz")
+    }
+    selectInput("func_type",  "Funktion / Datensatz:", choices = choices)
+  })
+
   output$rf_An_ui <- renderUI({
     numericInput("rf_A_n", "A_n (Bootstrap Sample-Größe):",
                  value = input$n_samples, min = 1, max = input$n_samples)
@@ -119,6 +138,11 @@ server <- function(input, output, session) {
 
   generate_data <- function(n, mode, func_type, add_noise) {
     set.seed(1)
+
+    if (func_type == "Iris-Datensatz") {
+      data(iris)
+      return(list(X = iris[, 1:4], y = iris$Species, f = NULL, mode = "Klassifikation", is_iris = TRUE))
+    }
 
     if (func_type == "Sinus") {
       f <- function(x) sin(x)
@@ -160,6 +184,10 @@ server <- function(input, output, session) {
 
   plot_data_greedy <- reactive({
     dat <- generate_data(input$n_samples, input$mode, input$func_type, input$add_noise)
+    # Für Iris: reduziere X auf die 2 gewählten Dimensionen
+    if (!is.null(dat$is_iris) && dat$is_iris) {
+      dat$X <- dat$X[, c(input$iris_x, input$iris_y)]
+    }
     dat$max_splits <- input$max_splits
     dat$min_leaf_size <- input$min_leaf_size
     dat$min_improve <- input$min_improve
@@ -169,6 +197,11 @@ server <- function(input, output, session) {
   pruning_computation <- eventReactive(input$run_model, {
     req(input$task == "Cost-Complexity Pruning")
     dat <- generate_data(input$n_samples, input$mode, input$func_type, input$add_noise)
+    # Feature-Auswahl für Iris
+    if (!is.null(dat$is_iris) && dat$is_iris) {
+      dat$X <- dat$X[, c(input$iris_x, input$iris_y)]
+    }
+
     is_auto <- input$auto_lambda
 
     withProgress(message = paste('Berechne', dat$mode, '...'), value = 0, {
@@ -197,6 +230,9 @@ server <- function(input, output, session) {
   bagging_computation <- eventReactive(input$run_model, {
     req(input$task == "Bagging")
     dat <- generate_data(input$n_samples, input$mode, input$func_type, input$add_noise)
+    if (!is.null(dat$is_iris) && dat$is_iris) {
+      dat$X <- dat$X[, c(input$iris_x, input$iris_y)]
+    }
 
     saved_B_trees <- input$B_trees
     saved_bag_class_method <- input$bag_class_method
@@ -229,6 +265,9 @@ server <- function(input, output, session) {
   rf_computation <- eventReactive(input$run_model, {
     req(input$task == "Random Forest")
     dat <- generate_data(input$n_samples, input$mode, input$func_type, input$add_noise)
+    if (!is.null(dat$is_iris) && dat$is_iris) {
+      dat$X <- dat$X[, c(input$iris_x, input$iris_y)]
+    }
 
     saved_B_trees <- input$rf_B_trees
     saved_mtry <- input$rf_mtry
@@ -236,7 +275,7 @@ server <- function(input, output, session) {
 
     d <- ncol(dat$X)
     if (saved_mtry > d) saved_mtry <- d
-    if (is.null(saved_A_n) || saved_A_n > input$n_samples) saved_A_n <- input$n_samples
+    if (is.null(saved_A_n) || saved_A_n > nrow(dat$X)) saved_A_n <- nrow(dat$X)
 
     withProgress(message = paste('Berechne Random Forest', dat$mode, '...'), value = 0.5, {
       if (dat$mode == "Regression") {
@@ -247,6 +286,7 @@ server <- function(input, output, session) {
                                         print_splits = FALSE)
         list(dat = dat, fit = fit, B_trees = saved_B_trees, mtry = saved_mtry, A_n = saved_A_n, show_individual = input$show_individual)
       } else {
+        # TODO
         NULL
       }
     })
@@ -277,19 +317,19 @@ server <- function(input, output, session) {
     plot(x_vals, dat$y, main = title_text, xlab = "x", ylab = "y", pch = 19, col = "gray", cex = 0.8)
 
     x_grid <- seq(min(x_vals), max(x_vals), length.out = 2000)
-    lines(x_grid, dat$f(x_grid), col = "gray", lwd = 2)
+    if (!is.null(dat$f)) lines(x_grid, dat$f(x_grid), col = "gray", lwd = 2)
 
     X_grid <- data.frame(x = x_grid)
     names(X_grid) <- names(dat$X)
 
     # Max. 25 Einzelbäume -> weniger Rechenaufwand & übersichtlicher
     if (show_individual) {
-        n_trees_to_plot <- min(fit$B, 25)
-        for (b in 1:n_trees_to_plot) {
-          tree_fit <- fit$trees[[b]]
-          tree_preds <- predict(tree_fit, X_grid)
-          lines(x_grid, tree_preds, col = rgb(0.2, 0.5, 0.8, alpha = 0.25), lwd = 1, type = "s")
-        }
+      n_trees_to_plot <- min(fit$B, 25)
+      for (b in 1:n_trees_to_plot) {
+        tree_fit <- fit$trees[[b]]
+        tree_preds <- predict(tree_fit, X_grid)
+        lines(x_grid, tree_preds, col = rgb(0.2, 0.5, 0.8, alpha = 0.25), lwd = 1, type = "s")
+      }
     }
 
     lines(x_grid, predict(fit, X_grid), col = "red", lwd = 2.5, type = "s")
