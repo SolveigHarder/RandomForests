@@ -1,8 +1,7 @@
 # Random Forests (Definition 6.52)
 
-# Lade die Baum-Funktion vom gierigen Verfahren
 source("R/GierigesVerf_Regression.R")
-
+source("R/GierigesVerf_Klassifikation.R")
 
 # Hauptfunktion: Random Forests für Regression
 
@@ -112,4 +111,96 @@ predict.random_forest_regression <- function(object, newdata, ...) {
   predictions <- rowMeans(all_predictions)
 
   return(predictions)
+}
+
+# Hauptfunktion: Random Forests für Klassifikation
+#
+# Parameter:
+#   X: Matrix oder data.frame mit Features (n x d)
+#   y: Vektor mit Klassenlabels (Länge n)
+#   B: Anzahl Bootstrap-Samples (Standard: 100)
+#   mtry: Anzahl der zufällig ausgewählten Features pro Split
+#   A_n: Größe des Bootstrap-Samples (Standard: n)
+#   ...: Weitere Parameter für fit_greedy_cart_classification (max_splits, min_leaf_size,...)
+#
+# Rückgabe:
+#   Objekt der Klasse "random_forest_classification" mit:
+#     - trees: Liste der B trainierten Bäume
+#     - B: Anzahl der Bäume
+#     - levels: Klassenlabels
+#
+random_forest_classification <- function(X, y, B = 100, mtry = NULL, A_n = NULL, ...) {
+
+  # Eingabe-Validierung
+  X <- as.data.frame(X)
+  n <- nrow(X)
+  d <- ncol(X)
+  y <- factor(y)
+
+  #Änderung für Random Forest
+  if (is.null(A_n)) A_n <- n
+  if (A_n < 1 || A_n > n) stop("A_n muss zwischen 1 ind n liegen")
+  if (!is.null(mtry) && (mtry < 1 || mtry > d)) stop("mtry muss zwischen 1 und d liegen")
+
+
+  if (length(y) != n) {
+    stop("Länge von y muss gleich Anzahl Zeilen in X sein")
+  }
+
+  if (B < 1) {
+    stop("B muss mindestens 1 sein")
+  }
+
+  # Liste für alle B Bäume
+  trees <- list()
+
+  # Hauptschleife: Für b = 1, ..., B
+  for (b in 1:B) {
+
+    # Bootstrap-Sample ziehen (mit Zurücklegen)
+    # Ziehe zufällig gleichverteilt n Indizes aus {1, ..., n}
+    replace_flag <- (A_n == n)
+    boot_idx <- sample.int(n, size = A_n, replace = replace_flag)
+
+    # Erstelle Bootstrap-Daten
+    X_boot <- X[boot_idx, , drop = FALSE]
+    y_boot <- y[boot_idx]
+
+    # Baue Klassifikationsbaum auf diesem Bootstrap-Sample
+    trees[[b]] <- fit_greedy_cart_classification(X_boot, y_boot, mtry = mtry, ...)
+  }
+
+  structure(
+    list(
+      trees = trees,
+      B = B,
+      levels = levels(y)
+    ),
+    class = "random_forest_classification"
+  )
+}
+
+# Vorhersage-Funktion für Random Forests-Klassifikation
+predict.random_forest_classification <- function(object, newdata, ...) {
+  B <- object$B
+  trees <- object$trees
+  levs <- object$levels
+
+  newdata <- as.data.frame(newdata)
+  n_new <- nrow(newdata)
+
+  # Matrix für alle Vorhersagen (character statt numeric)
+  all_predictions <- matrix(NA_character_, nrow = n_new, ncol = B)
+
+  for (b in 1:B) {
+    all_predictions[, b] <- as.character(predict(trees[[b]], newdata))
+  }
+
+  # Aggregation: Majority Vote pro Datenpunkt (Definition 6.26)
+  predictions <- apply(all_predictions, 1, function(row) {
+    tab <- table(factor(row, levels = levs))
+    names(tab)[which.max(tab)]
+  })
+
+  factor(predictions, levels = levs)
 }

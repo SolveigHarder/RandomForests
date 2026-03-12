@@ -91,6 +91,11 @@ ui <- fluidPage(
       ),
 
       conditionalPanel(
+        condition = "input.task == 'Random Forest' || input.task == 'Bagging'",
+        checkboxInput("show_error_graph", "Fehlergraph anzeigen", value = TRUE)
+      ),
+
+      conditionalPanel(
         condition = "(input.task == 'Random Forest' || input.task == 'Bagging') && input.mode == 'Regression'",
         checkboxInput("show_individual", "Einzelbäume anzeigen (erste 25)", value = FALSE)
       ),
@@ -106,7 +111,12 @@ ui <- fluidPage(
 
     mainPanel(
       uiOutput("lambda_slider_ui"),
-      plotOutput("treePlot", height = "600px")
+      plotOutput("treePlot", height = "500px"),
+      br(),
+      conditionalPanel(
+        condition = "(input.task == 'Random Forest' || input.task == 'Bagging') && input.show_error_graph == true",
+        plotOutput("errorPlot", height = "350px")
+      )
     )
   )
 )
@@ -117,6 +127,9 @@ server <- function(input, output, session) {
     choices <- c("Sinus", "Cosinus", "Stufenfunktion")
     if (input$mode == "Klassifikation") {
       choices <- c(choices, "Iris-Datensatz")
+    }
+    if (input$task == "Random Forest") {
+        choices <- c(choices, "5D-Raum")
     }
     selectInput("func_type",  "Funktion / Datensatz:", choices = choices)
   })
@@ -141,7 +154,26 @@ server <- function(input, output, session) {
 
     if (func_type == "Iris-Datensatz") {
       data(iris)
-      return(list(X = iris[, 1:4], y = iris$Species, f = NULL, mode = "Klassifikation", is_iris = TRUE))
+      return(list(X = iris[, 1:4], y = iris$Species, f = NULL, mode = "Klassifikation", is_iris = TRUE, dims = 4))
+    }
+
+    if (func_type == "5D-Raum") {
+      X <- as.data.frame(matrix(runif(n * 5, -1, 1), ncol = 5))
+      colnames(X) <- paste0("X", 1:5)
+      f_val <- X$X1^2 + sin(pi * X$X2) + (X$X3 * X$X4) + ifelse(X$X5 > 0, 0.5, -0.5)
+
+      if (mode == "Regression") {
+        y <- f_val + (if(add_noise) rnorm(n, sd = 0.3) else 0)
+        return(list(X = X, y = y, f = NULL, mode = "Regression", dims = 5))
+      } else {
+        prob <- 1 / (1 + exp(-2 * f_val))
+        y_true <- ifelse(runif(n) < prob, 1, 2)
+        if (add_noise) {
+          flip <- runif(n) < 0.05
+          y_true[flip] <- ifelse(y_true[flip] == 1, 2, 1)
+        }
+        return(list(X = X, y = as.factor(y_true), f = NULL, mode = "Klassifikation", dims = 5))
+      }
     }
 
     if (func_type == "Sinus") {
@@ -162,6 +194,7 @@ server <- function(input, output, session) {
         y <- y + rnorm(n, sd = 0.2)
       }
       X <- data.frame(x = x)
+      dims <- 1
     } else {
       grid_vals <- f(seq(min_x, max_x, length.out = 1000))
       min_y <- min(grid_vals) - 0.5
@@ -177,9 +210,10 @@ server <- function(input, output, session) {
         y_true[flip] <- ifelse(y_true[flip] == 1, 2, 1)
       }
       y <- as.factor(y_true)
+      dims <- 2
     }
 
-    list(X = X, y = y, f = f, mode = mode, min_x = min_x, max_x = max_x)
+    list(X = X, y = y, f = f, mode = mode, min_x = min_x, max_x = max_x, dims = dims)
   }
 
   plot_data_greedy <- reactive({
@@ -237,7 +271,7 @@ server <- function(input, output, session) {
     saved_B_trees <- input$B_trees
     saved_bag_class_method <- input$bag_class_method
 
-    withProgress(message = paste('Berechne Bagging', dat$mode, '...'), value = 0.5, {
+    withProgress(message = paste('Berechne Bagging', dat$mode, '...'), value = 0.3, {
 
       if (dat$mode == "Regression") {
         fit <- bagging_regression(dat$X, dat$y, B = saved_B_trees,
@@ -258,7 +292,30 @@ server <- function(input, output, session) {
         }
       }
 
-      list(dat = dat, fit = fit, B_trees = saved_B_trees, class_method = saved_bag_class_method, show_individual = input$show_individual)
+      incProgress(0.6, detail = "Berechne Fehlerrate...")
+
+      all_preds <- matrix(NA, nrow = nrow(dat$X), ncol = saved_B_trees)
+      for(b in 1:saved_B_trees) {
+        all_preds[, b] <- as.numeric(predict(fit$trees[[b]], dat$X))
+      }
+
+      error_vals <- numeric(saved_B_trees)
+      if (dat$mode == "Regression") {
+        for(b in 1:saved_B_trees) {
+          collected_pred <- rowMeans(all_preds[, 1:b, drop = FALSE])
+          error_vals[b] <- mean((collected_pred - dat$y)^2)
+        }
+      } else {
+        y_numeric <- as.numeric(dat$y)
+        for(b in 1:saved_B_trees) {
+          collected_pred <- apply(all_preds[, 1:b, drop = FALSE], 1, function(x) {
+            as.numeric(names(which.max(table(x))))
+          })
+          error_vals[b] <- mean(collected_pred != y_numeric)
+        }
+      }
+
+      list(dat = dat, fit = fit, B_trees = saved_B_trees, class_method = saved_bag_class_method, show_individual = input$show_individual, errors = error_vals)
     })
   }, ignoreNULL = TRUE)
 
@@ -277,18 +334,47 @@ server <- function(input, output, session) {
     if (saved_mtry > d) saved_mtry <- d
     if (is.null(saved_A_n) || saved_A_n > nrow(dat$X)) saved_A_n <- nrow(dat$X)
 
-    withProgress(message = paste('Berechne Random Forest', dat$mode, '...'), value = 0.5, {
-      if (dat$mode == "Regression") {
+    withProgress(message = 'Berechne Random Forest...', value = 0, {
+      if (input$mode == "Regression") {
         fit <- random_forest_regression(dat$X, dat$y, B = saved_B_trees,
                                         mtry = saved_mtry, A_n = saved_A_n,
                                         max_splits = input$rf_max_splits,
                                         min_leaf_size = input$rf_min_leaf_size,
                                         print_splits = FALSE)
-        list(dat = dat, fit = fit, B_trees = saved_B_trees, mtry = saved_mtry, A_n = saved_A_n, show_individual = input$show_individual)
       } else {
-        # TODO
-        NULL
+        fit <- random_forest_classification(dat$X, dat$y, B = saved_B_trees,
+                                            mtry = saved_mtry,
+                                            max_splits = input$rf_max_splits,
+                                            min_leaf_size = input$rf_min_leaf_size,
+                                            print_splits = FALSE)
       }
+
+      incProgress(0.6, detail = "Berechne Fehlerrate...")
+
+      all_preds <- matrix(NA, nrow = nrow(dat$X), ncol = saved_B_trees)
+      for(b in 1:saved_B_trees) {
+        all_preds[, b] <- as.numeric(predict(fit$trees[[b]], dat$X))
+      }
+
+      error_vals <- numeric(saved_B_trees)
+      if (input$mode == "Regression") {
+        for(b in 1:saved_B_trees) {
+          collected_pred <- rowMeans(all_preds[, 1:b, drop = FALSE])
+          error_vals[b] <- mean((collected_pred - dat$y)^2)
+        }
+      } else {
+        y_numeric <- as.numeric(dat$y)
+        for(b in 1:saved_B_trees) {
+          collected_pred <- apply(all_preds[, 1:b, drop = FALSE], 1, function(x) {
+            as.numeric(names(which.max(table(x))))
+          })
+          error_vals[b] <- mean(collected_pred != y_numeric)
+        }
+      }
+
+      list(dat = dat, fit = fit, B_trees = saved_B_trees, mtry = saved_mtry,
+           A_n = saved_A_n, show_individual = input$show_individual,
+           errors = error_vals)
     })
   }, ignoreNULL = TRUE)
 
@@ -336,7 +422,7 @@ server <- function(input, output, session) {
 
     par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
     plot(0, 0, type = "n", bty = "n", xaxt = "n", yaxt = "n")
-    legend("bottom", legend = c("Daten", "Originale Funktion", "Einzelbäume", "Ensemble Vorhersage"),
+    legend("bottom", legend = c("Daten", "Originale Funktion", "Einzelbäume", "Vorhersage"),
            col = c("gray", "gray", rgb(0.2, 0.5, 0.8, alpha = 0.6), "red"),
            lty = c(NA, 1, 1, 1),
            pch = c(19, NA, NA, NA),
@@ -369,7 +455,30 @@ server <- function(input, output, session) {
     text(0.5, 0.5, msg, cex = 1.2)
   }
 
-  # --- Plot ---
+  output$errorPlot <- renderPlot({
+    req(input$task %in% c("Random Forest", "Bagging"), input$show_error_graph)
+
+    if (input$task == "Random Forest") {
+      res <- rf_computation()
+    } else {
+      res <- bagging_computation()
+    }
+    req(res)
+
+    y_label <- if(input$mode == "Regression") "Mean Squared Error" else "Fehlklassifikationsrate"
+    plot_title <- paste("Error Graph -", input$task, "-", input$mode)
+
+    plot(1:res$B_trees, res$errors, type = "l", lwd = 2, col = "darkblue",
+         xlab = "Anzahl der Bäume (B)", ylab = y_label,
+         main = plot_title)
+    points(1:res$B_trees, res$errors, pch = 20, col = "darkblue", cex = 0.5)
+    grid()
+    abline(h = tail(res$errors, 1), lty = 2, col = "red")
+    legend("topright", legend = c("Fehler", paste("Endfehler:", round(tail(res$errors, 1), 4))),
+           col = c("darkblue", "red"), lty = c(1, 2), bty = "n")
+  })
+
+  # --- Main Tree Plot ---
   output$treePlot <- renderPlot({
     task <- input$task
 
@@ -453,18 +562,22 @@ server <- function(input, output, session) {
         }
 
       } else if (task == "Random Forest") {
-
-        if (input$mode == "Klassifikation") {
-          return(show_message_plot("TODO: Nicht implementiert"))
-        }
-
         res <- rf_computation()
         req(res)
 
-        title_rf <- sprintf("Random Forest Regression (B = %d, mtry = %d, A_n = %d)",
-                            res$B_trees, res$mtry, res$A_n)
-        plot_multi_tree_regression(res$fit, res$dat, title_rf, res$show_individual)
-
+        # TODO: Finde ein gutes praktisches Beispiel bzw. Visualisierung für Random Forests
+        if(ncol(res$dat$X) > 2) {
+          show_message_plot("Kein Graph vorhanden")
+        }
+        else if (input$mode == "Regression") {
+          title_rf <- sprintf("Random Forest Regression (B = %d, mtry = %d, A_n = %d)",
+                              res$B_trees, res$mtry, res$A_n)
+          plot_multi_tree_regression(res$fit, res$dat, title_rf, res$show_individual)
+        } else {
+          par(oma = c(3, 0, 0, 0))
+          plot_classification_fit(res$fit, res$dat$X, res$dat$y, "Random Forest Klassifikation", res$dat$f, res = input$plot_res)
+          add_classification_legend(levels(res$dat$y))
+        }
       }
     })
   })

@@ -37,7 +37,7 @@ candidate_splits <- function(xj) {
 # X: n x d (matrix oder df), y: Länge n
 # idx: welche Punkte sind im aktuellen Blatt A(v)
 
-best_split_for_leaf_class <- function(X, y, idx, min_leaf_size = 1) { #nach Buch
+best_split_for_leaf_class <- function(X, y, idx, min_leaf_size = 1, mtry = NULL) { #nach Buch
 
   X <- as.matrix(X)  # sicherheitshalber
   if (is.null(nrow(X))) X <- matrix(X, nrow = 1)
@@ -56,7 +56,14 @@ best_split_for_leaf_class <- function(X, y, idx, min_leaf_size = 1) { #nach Buch
     c2 = NA_character_
   )
 
-  for (j in seq_len(d)) {
+  # Änderung: für Random Forest Algorithmus nur noch mtry features nutzen
+  feature_set <- if (is.null(mtry) || mtry >= d) {
+    seq_len(d)
+  } else {
+    sample.int(d, size = mtry, replace = FALSE)
+  }
+
+  for (j in feature_set) { #Hier nur noch für alle j in feature set mit Größe mtry machen
 
     xj_all <- X[idx, j]                 # Feature j im Blatt
     s_candidates <- candidate_splits(xj_all)
@@ -134,7 +141,8 @@ fit_greedy_cart_classification <- function(X, y,
                                        max_splits = 10^9, #Buch Abbruch: nur wenn kein Blatt mehr splitbar ist
                                        min_leaf_size = 1,
                                        min_improve = 1e-12,
-                                       print_splits = TRUE) { #nach Buch sonst -infinity?
+                                       print_splits = TRUE, #nach Buch sonst -infinity?
+                                       mtry = NULL) {
 
   y <- factor(y)
   X <- as.matrix(X)
@@ -169,7 +177,8 @@ fit_greedy_cart_classification <- function(X, y,
       if (length(idx) < 2 * min_leaf_size) next
 
       parent_err <- misclass_of_indices(y, idx) ###für Klassifikation
-      split <- best_split_for_leaf_class(X, y, idx, min_leaf_size = min_leaf_size)
+      split <- best_split_for_leaf_class(X, y, idx, min_leaf_size = min_leaf_size,
+                                         mtry = mtry)
 
       # Falls kein gültiger Split existiert:
       if (is.na(split$j)) next
