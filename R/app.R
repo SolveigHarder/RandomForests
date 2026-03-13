@@ -65,7 +65,7 @@ ui <- fluidPage(
 
       conditionalPanel(
         condition = "input.task == 'Cost-Complexity Pruning' && input.auto_lambda == true",
-        sliderInput("cv_folds", "CV Folds (M):", min = 2, max = 10, value = 5, step = 1)
+        sliderInput("cv_folds", "Cross-validation Folds (M):", min = 2, max = 10, value = 5, step = 1)
       ),
 
       # Parameter für Bagging
@@ -120,6 +120,15 @@ ui <- fluidPage(
 )
 
 server <- function(input, output, session) {
+  run_trigger <- reactiveVal(0)
+
+  observeEvent(input$run_model, {
+    run_trigger(run_trigger() + 1)
+  })
+
+  observeEvent(input$task, {
+    run_trigger(0)
+  })
 
   output$func_select_ui <- renderUI({
     choices <- c("Sinus", "Cosinus", "Stufenfunktion")
@@ -233,7 +242,7 @@ server <- function(input, output, session) {
     dat
   })
 
-  pruning_computation <- eventReactive(input$run_model, {
+  pruning_computation <- eventReactive(run_trigger(), {
     req(input$task == "Cost-Complexity Pruning")
     dat <- generate_data(input$n_samples, input$mode, input$func_type, input$add_noise, input$global_seed)
     # Feature-Auswahl für Iris
@@ -267,7 +276,7 @@ server <- function(input, output, session) {
     })
   }, ignoreNULL = TRUE)
 
-  bagging_computation <- eventReactive(input$run_model, {
+  bagging_computation <- eventReactive(run_trigger(), {
     req(input$task == "Bagging")
     dat <- generate_data(input$n_samples, input$mode, input$func_type, input$add_noise, input$global_seed)
     if (!is.null(dat$is_iris) && dat$is_iris) {
@@ -326,7 +335,7 @@ server <- function(input, output, session) {
     })
   }, ignoreNULL = TRUE)
 
-  rf_computation <- eventReactive(input$run_model, {
+  rf_computation <- eventReactive(run_trigger(), {
     req(input$task == "Random Forest")
     dat <- generate_data(input$n_samples, input$mode, input$func_type, input$add_noise, input$global_seed)
     if (!is.null(dat$is_iris) && dat$is_iris) {
@@ -421,6 +430,7 @@ server <- function(input, output, session) {
   # --- Pruning Schritt Slider ---
   output$lambda_slider_ui <- renderUI({
     req(input$task == "Cost-Complexity Pruning")
+    req(run_trigger() > 0)
     res <- pruning_computation()
     req(res)
 
@@ -497,6 +507,7 @@ server <- function(input, output, session) {
 
   output$errorPlot <- renderPlot({
     req(input$task %in% c("Random Forest", "Bagging"))
+    req(run_trigger() > 0)
 
     if (input$task == "Random Forest") {
       res <- rf_computation()
@@ -518,11 +529,12 @@ server <- function(input, output, session) {
            col = c("darkblue", "red"), lty = c(1, 2), bty = "n")
   })
 
-  # --- Main Tree Plot ---
+  # --- Plot oben ---
   output$treePlot <- renderPlot({
     task <- input$task
 
-    if (task %in% c("Cost-Complexity Pruning", "Bagging", "Random Forest") && input$run_model == 0) {
+    # für komplexere/längere Berechnungen warte bis der Nutzer die Starttaste drückt
+    if (task %in% c("Cost-Complexity Pruning", "Bagging", "Random Forest") && run_trigger() == 0) {
       return(show_message_plot("Bitte Parameter wählen und auf 'Berechnen & Plotten' klicken."))
     }
 
