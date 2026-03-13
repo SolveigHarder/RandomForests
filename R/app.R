@@ -41,6 +41,8 @@ ui <- fluidPage(
         checkboxInput("add_noise", "Rauschen hinzufügen", value = TRUE)
       ),
 
+      numericInput("global_seed", "Random Seed:", value = 1, min = 1),
+
       # Parameter für Klassifikationen
       conditionalPanel(
         condition = "input.mode == 'Klassifikation'",
@@ -91,12 +93,7 @@ ui <- fluidPage(
       ),
 
       conditionalPanel(
-        condition = "input.task == 'Random Forest' || input.task == 'Bagging'",
-        checkboxInput("show_error_graph", "Fehlergraph anzeigen", value = TRUE)
-      ),
-
-      conditionalPanel(
-        condition = "(input.task == 'Random Forest' || input.task == 'Bagging') && input.mode == 'Regression'",
+        condition = "input.task == 'Bagging' && input.mode == 'Regression'",
         checkboxInput("show_individual", "Einzelbäume anzeigen (erste 25)", value = FALSE)
       ),
 
@@ -105,16 +102,17 @@ ui <- fluidPage(
         hr(),
         actionButton("run_model", "Berechnen & Plotten",
                      class = "btn-primary", icon = icon("play")),
+        br(),
         helpText("Hinweis: Berechnungen können bei vielen Datenpunkten/Bäumen eine Weile dauern.")
       )
     ),
 
     mainPanel(
       uiOutput("lambda_slider_ui"),
-      plotOutput("treePlot", height = "500px"),
+      plotOutput("treePlot", height = "600px"),
       br(),
       conditionalPanel(
-        condition = "(input.task == 'Random Forest' || input.task == 'Bagging') && input.show_error_graph == true",
+        condition = "input.task == 'Random Forest' || input.task == 'Bagging'",
         plotOutput("errorPlot", height = "350px")
       )
     )
@@ -129,7 +127,7 @@ server <- function(input, output, session) {
       choices <- c(choices, "Iris-Datensatz")
     }
     if (input$task == "Random Forest") {
-        choices <- c(choices, "5D-Raum")
+      choices <- c(choices, "5D-Raum")
     }
     selectInput("func_type",  "Funktion / Datensatz:", choices = choices)
   })
@@ -148,9 +146,16 @@ server <- function(input, output, session) {
       }
     }
   })
+  # Random Forests ist für mehrdimensionale Daten interessant; wähle 5D-Raum automatisch aus
+  observeEvent(input$task, {
+    if (input$task == "Random Forest") {
+      updateSelectInput(session, "func_type", selected = "5D-Raum")
+      updateCheckboxInput(session, "add_noise", value = FALSE)
+    }
+  })
 
-  generate_data <- function(n, mode, func_type, add_noise) {
-    set.seed(1)
+  generate_data <- function(n, mode, func_type, add_noise, seed) {
+    set.seed(seed)
 
     if (func_type == "Iris-Datensatz") {
       data(iris)
@@ -217,7 +222,7 @@ server <- function(input, output, session) {
   }
 
   plot_data_greedy <- reactive({
-    dat <- generate_data(input$n_samples, input$mode, input$func_type, input$add_noise)
+    dat <- generate_data(input$n_samples, input$mode, input$func_type, input$add_noise, input$global_seed)
     # Für Iris: reduziere X auf die 2 gewählten Dimensionen
     if (!is.null(dat$is_iris) && dat$is_iris) {
       dat$X <- dat$X[, c(input$iris_x, input$iris_y)]
@@ -230,7 +235,7 @@ server <- function(input, output, session) {
 
   pruning_computation <- eventReactive(input$run_model, {
     req(input$task == "Cost-Complexity Pruning")
-    dat <- generate_data(input$n_samples, input$mode, input$func_type, input$add_noise)
+    dat <- generate_data(input$n_samples, input$mode, input$func_type, input$add_noise, input$global_seed)
     # Feature-Auswahl für Iris
     if (!is.null(dat$is_iris) && dat$is_iris) {
       dat$X <- dat$X[, c(input$iris_x, input$iris_y)]
@@ -239,6 +244,7 @@ server <- function(input, output, session) {
     is_auto <- input$auto_lambda
 
     withProgress(message = paste('Berechne', dat$mode, '...'), value = 0, {
+      set.seed(input$global_seed)
       incProgress(0.2, detail = "Vollständiger Baum wird erzeugt...")
 
       if (dat$mode == "Regression") {
@@ -263,7 +269,7 @@ server <- function(input, output, session) {
 
   bagging_computation <- eventReactive(input$run_model, {
     req(input$task == "Bagging")
-    dat <- generate_data(input$n_samples, input$mode, input$func_type, input$add_noise)
+    dat <- generate_data(input$n_samples, input$mode, input$func_type, input$add_noise, input$global_seed)
     if (!is.null(dat$is_iris) && dat$is_iris) {
       dat$X <- dat$X[, c(input$iris_x, input$iris_y)]
     }
@@ -272,6 +278,7 @@ server <- function(input, output, session) {
     saved_bag_class_method <- input$bag_class_method
 
     withProgress(message = paste('Berechne Bagging', dat$mode, '...'), value = 0.3, {
+      set.seed(input$global_seed)
 
       if (dat$mode == "Regression") {
         fit <- bagging_regression(dat$X, dat$y, B = saved_B_trees,
@@ -321,7 +328,7 @@ server <- function(input, output, session) {
 
   rf_computation <- eventReactive(input$run_model, {
     req(input$task == "Random Forest")
-    dat <- generate_data(input$n_samples, input$mode, input$func_type, input$add_noise)
+    dat <- generate_data(input$n_samples, input$mode, input$func_type, input$add_noise, input$global_seed)
     if (!is.null(dat$is_iris) && dat$is_iris) {
       dat$X <- dat$X[, c(input$iris_x, input$iris_y)]
     }
@@ -335,6 +342,7 @@ server <- function(input, output, session) {
     if (is.null(saved_A_n) || saved_A_n > nrow(dat$X)) saved_A_n <- nrow(dat$X)
 
     withProgress(message = 'Berechne Random Forest...', value = 0, {
+      set.seed(input$global_seed)
       if (input$mode == "Regression") {
         fit <- random_forest_regression(dat$X, dat$y, B = saved_B_trees,
                                         mtry = saved_mtry, A_n = saved_A_n,
@@ -372,11 +380,43 @@ server <- function(input, output, session) {
         }
       }
 
+      # RF ist für 1D-Daten identisch zu Bagging
+      # Für Hyperdimensionale Daten zeige Feature Usage im Vergleich zu Bagging
+      bag_fit <- NULL
+      if (ncol(dat$X) > 2) {
+        set.seed(input$global_seed)
+        if (input$mode == "Regression") {
+          bag_fit <- bagging_regression(dat$X, dat$y, B = saved_B_trees,
+                                        max_splits = input$rf_max_splits,
+                                        min_leaf_size = input$rf_min_leaf_size,
+                                        print_splits = FALSE)
+        } else {
+          bag_fit <- bagging_classification(dat$X, dat$y, B = saved_B_trees,
+                                            max_splits = input$rf_max_splits,
+                                            min_leaf_size = input$rf_min_leaf_size,
+                                            print_splits = FALSE)
+        }
+      }
+
       list(dat = dat, fit = fit, B_trees = saved_B_trees, mtry = saved_mtry,
            A_n = saved_A_n, show_individual = input$show_individual,
-           errors = error_vals)
+           errors = error_vals, bag_fit = bag_fit)
     })
   }, ignoreNULL = TRUE)
+
+  # Zählt wie oft Feature in allen Bäumen als Split benutzt wurde
+  count_feature_usage <- function(model, d) {
+    counts <- integer(d)
+    for (tr in model$trees) {
+      nodes <- tr$nodes
+      for (nd in nodes) {
+        if (!is.null(nd$j) && !is.na(nd$j)) {
+          counts[nd$j] <- counts[nd$j] + 1
+        }
+      }
+    }
+    counts
+  }
 
   # --- Pruning Schritt Slider ---
   output$lambda_slider_ui <- renderUI({
@@ -456,7 +496,7 @@ server <- function(input, output, session) {
   }
 
   output$errorPlot <- renderPlot({
-    req(input$task %in% c("Random Forest", "Bagging"), input$show_error_graph)
+    req(input$task %in% c("Random Forest", "Bagging"))
 
     if (input$task == "Random Forest") {
       res <- rf_computation()
@@ -465,8 +505,8 @@ server <- function(input, output, session) {
     }
     req(res)
 
-    y_label <- if(input$mode == "Regression") "Mean Squared Error" else "Fehlklassifikationsrate"
-    plot_title <- paste("Error Graph -", input$task, "-", input$mode)
+    y_label <- if(res$dat$mode == "Regression") "Mean Squared Error" else "Fehlklassifikationsrate"
+    plot_title <- paste("Error Graph -", input$task, "-", res$dat$mode)
 
     plot(1:res$B_trees, res$errors, type = "l", lwd = 2, col = "darkblue",
          xlab = "Anzahl der Bäume (B)", ylab = y_label,
@@ -538,8 +578,8 @@ server <- function(input, output, session) {
         } else {
           par(mfrow = c(1, 2), oma = c(3, 0, 0, 0))
           fit_pruned <- structure(list(nodes = fit_pruned_nodes, levels = fit$levels), class = "greedy_cart_clas")
-          plot_classification_fit(fit, dat$X, dat$y, "Ungestutzt (Voll ausgewachsen)", dat$f, res = input$plot_res)
-          plot_classification_fit(fit_pruned, dat$X, dat$y, title_pruned, dat$f, res = input$plot_res)
+          plot_classification_fit(fit, dat$X, dat$y, "Ungestutzt (Voll ausgewachsen)", dat$f, res = isolate(input$plot_res))
+          plot_classification_fit(fit_pruned, dat$X, dat$y, title_pruned, dat$f, res = isolate(input$plot_res))
           add_classification_legend(levels(dat$y))
         }
 
@@ -557,25 +597,36 @@ server <- function(input, output, session) {
           meth <- ifelse(res$class_method == "Majority Vote (Def 6.26)", "Majority", "Proba")
           title_bag <- sprintf("Bagging Klassifikation (B = %d, %s)", res$B_trees, meth)
 
-          plot_classification_fit(fit, dat$X, dat$y, title_bag, dat$f, res = input$plot_res)
+          plot_classification_fit(fit, dat$X, dat$y, title_bag, dat$f, res = isolate(input$plot_res))
           add_classification_legend(levels(dat$y))
         }
 
       } else if (task == "Random Forest") {
         res <- rf_computation()
         req(res)
+        dat <- res$dat
 
-        # TODO: Finde ein gutes praktisches Beispiel bzw. Visualisierung für Random Forests
-        if(ncol(res$dat$X) > 2) {
-          show_message_plot("Kein Graph vorhanden")
-        }
-        else if (input$mode == "Regression") {
+        if (ncol(dat$X) > 2) {
+          bag_fit <- res$bag_fit
+
+          d <- ncol(dat$X)
+          names_feats <- colnames(dat$X)
+          bag_counts <- count_feature_usage(bag_fit, d)
+          rf_counts  <- count_feature_usage(res$fit, d)
+
+          par(mfrow = c(1, 2), mar = c(4, 4, 2, 1), oma = c(0, 0, 3, 0))
+          barplot(bag_counts, names.arg = names_feats, las = 2,
+                  main = "Feature-Usage: Bagging", ylim = c(0, max(c(bag_counts, rf_counts))+1))
+          barplot(rf_counts, names.arg = names_feats, las = 2,
+                  main = "Feature-Usage: Random Forest", ylim = c(0, max(c(bag_counts, rf_counts))+1))
+
+        } else if (res$dat$mode == "Regression") {
           title_rf <- sprintf("Random Forest Regression (B = %d, mtry = %d, A_n = %d)",
                               res$B_trees, res$mtry, res$A_n)
           plot_multi_tree_regression(res$fit, res$dat, title_rf, res$show_individual)
         } else {
           par(oma = c(3, 0, 0, 0))
-          plot_classification_fit(res$fit, res$dat$X, res$dat$y, "Random Forest Klassifikation", res$dat$f, res = input$plot_res)
+          plot_classification_fit(res$fit, res$dat$X, res$dat$y, "Random Forest Klassifikation", res$dat$f, res = isolate(input$plot_res))
           add_classification_legend(levels(res$dat$y))
         }
       }
