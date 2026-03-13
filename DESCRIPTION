@@ -4,14 +4,28 @@ Title: Regression und Klassifikation mit CART-Entscheidungsbäumen, Random Fores
 Version: 0.1.0
 Authors@R: c(
     person(
-      "Jane", "Doe",
-      email = "jane@example.com",
+      "Annika", "Lehmann",
+      email = "annika.lehman@stud.uni-heidelberg.de",
+      role = c("aut", "cre")
+    ),
+    person(
+      "Bengt", "Ordowski",
+      email = "bengt.ordowski@stud.uni-heidelberg.de",
+      role = c("aut", "cre")
+    ),
+    person(
+      "Solveig", "Harder",
+      email = "solveig.harder@stud.uni-heidelberg.de",
+      role = c("aut", "cre")
+    ),
+    person(
+      "Tim", "Schneeberger",
+      email = "tim.schneeberger@stud.uni-heidelberg.de",
       role = c("aut", "cre")
     )
   )
-Description: More about what it does (maybe more than one line).
-    Continuation lines should be indented.
-License: What license is it under?
+Description: Implementierungen von gierigen Verfahren, Cost-Complexity Pruning, Bagging und Random Forest Algorithmen, sowie einer Shiny-App zur einfachen Visualisierung von Beispielen.
+License: MIT
 Encoding: UTF-8
 LazyData: true
 Imports: shiny
