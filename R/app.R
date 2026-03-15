@@ -71,7 +71,7 @@ ui <- fluidPage(
       # Parameter für Bagging
       conditionalPanel(
         condition = "input.task == 'Bagging'",
-        sliderInput("B_trees", "Anzahl Bäume (B):", min = 1, max = 200, value = 50, step = 5),
+        sliderInput("B_trees", "Anzahl Bäume (B):", min = 1, max = 200, value = 30, step = 1),
         numericInput("bag_max_splits", "Max Splits pro Baum:", value = 30, min = 1),
         numericInput("bag_min_leaf_size", "Min Leaf Size pro Baum:", value = 3, min = 1),
 
