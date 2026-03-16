@@ -6,12 +6,12 @@ Authors@R: c(
     person(
       "Annika", "Lehmann",
       email = "annika.lehman@stud.uni-heidelberg.de",
-      role = c("aut", "cre")
+      role = "aut"
     ),
     person(
       "Bengt", "Ordowski",
       email = "bengt.ordowski@stud.uni-heidelberg.de",
-      role = c("aut", "cre")
+      role = "aut"
     ),
     person(
       "Solveig", "Harder",
@@ -21,11 +21,16 @@ Authors@R: c(
     person(
       "Tim", "Schneeberger",
       email = "tim.schneeberger@stud.uni-heidelberg.de",
-      role = c("aut", "cre")
+      role = "aut"
     )
   )
 Description: Implementierungen von gierigen Verfahren, Cost-Complexity Pruning, Bagging und Random Forest Algorithmen, sowie einer Shiny-App zur einfachen Visualisierung von Beispielen.
 License: MIT
 Encoding: UTF-8
 LazyData: true
-Imports: shiny
+Suggests: 
+    knitr,
+    rmarkdown,
+    shiny
+VignetteBuilder: knitr
+RoxygenNote: 7.3.3
