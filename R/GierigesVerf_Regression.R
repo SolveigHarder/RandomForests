@@ -37,7 +37,7 @@ best_split_for_leaf <- function(X, y, idx, min_leaf_size = 1, mtry = NULL) { #na
     sample.int(d, size = mtry, replace = FALSE)
   }
 
-  sse_parent <- sse_of_indices(y, idx) #FEHLT
+  sse_parent <- sse_of_indices(y, idx) 
 
   best <- list(
     score = Inf,          # = SSE_left + SSE_right  (das ist (6.10))
@@ -179,7 +179,7 @@ fit_greedy_cart_regression <- function(X, y,
     if (is.na(best_global$leaf_id)) break
 
     # Optionaler Abbruch über "Verbesserung":
-    # Verbesserung = SSE(parent) - score. Das ist buch-fremd, aber praktisch.
+    # Verbesserung = SSE(parent) - score. 
     if (best_global$improvement < min_improve) break
 
     # Split ausführen
@@ -244,6 +244,3 @@ predict.greedy_cart_reg <- function(object, newdata, ...) {
   preds
 }
 
-
-
- # wichtigste Frage: sagt der Algorithmus wie ich denn verschiedene Blätter dann durchgehen soll?
