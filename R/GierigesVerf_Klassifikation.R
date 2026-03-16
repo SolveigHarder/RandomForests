@@ -14,8 +14,7 @@
 
 majority_class <- function(y, idx) {
   tab <- table(y[idx]) #zählt: wie oft kommt jede Klasse vor
-  names(tab)[which.max(tab)]  # liefert Klassenlabel (character) mit der meisten Häufigkeit,
-  #Frage: bei Gleichheit einfach die erste? also passt das oder eher per Zufall
+  names(tab)[which.max(tab)]  # liefert Klassenlabel (character) mit der meisten Häufigkeit, bei Gleichheit erste
 }
 
 # Fehlklassifikationen im Blatt, wenn man Majority predicten würde
@@ -87,7 +86,6 @@ best_split_for_leaf_class <- function(X, y, idx, min_leaf_size = 1, mtry = NULL)
       # score gemäß (6.11): Fehlklassifikationen links + rechts
       err_left  <- misclass_of_indices(y, left_idx)
       err_right <- misclass_of_indices(y, right_idx)
-      #bis hier unterschiedlich
       score <- err_left + err_right #(6.11) im Algorithmus
       #Gesamtzahl falscher Klassifikationen nach dem Split, wenn jedes Kindblatt seine Mehrheitsklasse vorhersagt.
 
@@ -134,7 +132,6 @@ new_node_class <- function(idx, y) {
 # Greedy Build: iterativ Blätter splitten
 # Variante A: "global greedy" (typisch)
 #   -> in jedem Schritt splitte das Blatt, das die größte Verbesserung bringt
-#
 #  passt zu "wir verringern das empirische Risiko am stärksten".
 #' Fit greedy CART classification tree
 #' @export
