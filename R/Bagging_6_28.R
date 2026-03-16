@@ -1,7 +1,6 @@
 # Bagging für Klassifikationsbäume per Klassen-Wahrscheinlichkeiten (Definition 6.28)
 # Benötigt: Def. 6.27 (predict_proba)
 
-source("R/GierigesVerf_Klassifikation.R")
 #' Definition 6.27: Klassenwahrscheinlichkeiten eines Baums
 #'
 #' Traversiert den Baum wie predict, gibt aber pro Punkt

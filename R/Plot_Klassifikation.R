@@ -1,5 +1,3 @@
-source("R/GierigesVerf_Klassifikation.R")
-source("R/Pruning.R")
 
 # Originale Grafikparameter speichern
 .pardefault <- par(no.readonly = TRUE)

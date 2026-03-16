@@ -3,8 +3,6 @@
 
 # Implementierung des Bagging-Algorithmus
 
-# Lade die Baum-Funktion vom gierigen Verfahren
-source("R/GierigesVerf_Regression.R")
 #' Bagging für Regression
 #'
 #' - Ziehe B Bootstrap-Samples (mit Zurücklegen)

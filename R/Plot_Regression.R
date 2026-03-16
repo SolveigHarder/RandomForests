@@ -1,5 +1,3 @@
-source("R/GierigesVerf_Regression.R")
-source("R/Pruning.R")
 
 # Originale Grafikparameter speichern, damit wir sie später zurücksetzen können
 .pardefault <- par(no.readonly=T)

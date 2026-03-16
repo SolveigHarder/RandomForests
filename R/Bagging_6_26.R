@@ -1,6 +1,5 @@
 # Bagging für Klassifikationsbäume per Majority Vote (Definition 6.26)
 
-source("R/GierigesVerf_Klassifikation.R")
 #' Bagging für Klassifikation
 #'
 #'@param Parameter:

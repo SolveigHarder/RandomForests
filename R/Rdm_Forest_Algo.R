@@ -1,7 +1,5 @@
 # Random Forests (Definition 6.52)
 
-source("R/GierigesVerf_Regression.R")
-source("R/GierigesVerf_Klassifikation.R")
 #' Hauptfunktion: Random Forests für Regression
 #'
 #' - Ziehe B Bootstrap-Samples (mit Zurücklegen)
