@@ -1,5 +1,5 @@
-source("R/GierigesVerf_Klassifikation.R")
-
+#source("R/GierigesVerf_Klassifikation.R")
+library(RandomForests)
 
 #TESTEN
 

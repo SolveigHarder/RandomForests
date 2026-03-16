@@ -1,5 +1,5 @@
-source("R/GierigesVerf_Regression.R")
-
+#source("R/GierigesVerf_Regression.R")
+library(RandomForests)
 
 set.seed(1)
 n <- 60

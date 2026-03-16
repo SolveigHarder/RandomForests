@@ -1,4 +1,5 @@
-source("R/Rdm_Forest_Algo.R")
+#source("R/Bagging_6_25.R")
+library(RandomForests)
 
 test_reg <- function(data, title, fit, ...) {
   X <- data$X
@@ -33,6 +34,8 @@ gen_data <- function(f, n, sd, xmin, xmax, test_train_split) {
     train=train
   )
 }
+
+
 set.seed(123)
 
 f_step <- function(x) ifelse(x < -.66, -1,
@@ -55,6 +58,6 @@ mse <- test_reg(data, "single", fit_greedy_cart_regression, max_splits=20, min_l
 cat("MSE single", mse, "\n")
 
 for(B in c(1, 5, 20, 100)) {
-  mse <- test_reg(data, sprintf("random_forest B=%d", B), random_forest_regression, B, max_splits=20, min_leaf_size=1, print_splits=FALSE)
+  mse <- test_reg(data, sprintf("bagging B=%d", B), bagging_regression, B, max_splits=20, min_leaf_size=1, print_splits=FALSE)
   cat("B=", B, "MSE=", mse, "\n")
 }

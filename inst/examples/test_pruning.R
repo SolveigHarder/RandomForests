@@ -1,6 +1,7 @@
-source("R/GierigesVerf_Regression.R")
-source("R/GierigesVerf_Klassifikation.R")
-source("R/Pruning.R")
+#source("R/GierigesVerf_Regression.R")
+#source("R/GierigesVerf_Klassifikation.R")
+#source("R/Pruning.R")
+library(RandomForests)
 
 set.seed(1)
 n <- 150

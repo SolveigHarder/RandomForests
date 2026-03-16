@@ -1,22 +1,5 @@
 library(shiny)
-
-# Die restlichen Skripte nehmen an, dass wir im Projekt-Root sind und nicht im R/ Unterordner.
-# RStudio's "Run App" Button startet allerdings dieses Skript im Unterordner, daher gehe in den Root-Ordner falls nötig.
-if (basename(getwd()) == "R") {
-  setwd("..")
-}
-
-# Algorithmen
-source("R/GierigesVerf_Klassifikation.R")
-source("R/GierigesVerf_Regression.R")
-source("R/Pruning.R")
-source("R/Bagging_6_25.R")
-source("R/Bagging_6_26.R")
-source("R/Bagging_6_28.R")
-source("R/Rdm_Forest_Algo.R")
-# Plotting
-source("R/Plot_Klassifikation.R")
-source("R/Plot_Regression.R")
+library(RandomForests)
 
 ui <- fluidPage(
   br(),

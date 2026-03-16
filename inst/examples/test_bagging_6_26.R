@@ -1,4 +1,5 @@
-source("R/Bagging_6_26.R")
+#source("R/Bagging_6_26.R")
+library(RandomForests)
 
 # Test
 gen_data <- function(f, n, noise, xmin, xmax, test_train_split) {
