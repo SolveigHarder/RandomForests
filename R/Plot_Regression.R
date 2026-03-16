@@ -5,6 +5,8 @@ source("R/Pruning.R")
 .pardefault <- par(no.readonly=T)
 
 # Siehe Abbildung 6.2 (Seite 166) im Buch
+#' plot regression fit
+#' @export
 plot_regression_fit <- function(tree, X, y, title,
                                 original_function, show_original_func) {
   stopifnot("Eingabe muss 1D sein" = ncol(X) == 1)

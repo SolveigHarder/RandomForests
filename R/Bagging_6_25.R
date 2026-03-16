@@ -1,31 +1,27 @@
 
 # Bagging für Regressionsbäume (Definition 6.25)
 
-#
 # Implementierung des Bagging-Algorithmus
 
 # Lade die Baum-Funktion vom gierigen Verfahren
 source("R/GierigesVerf_Regression.R")
-
-
-# Hauptfunktion: Bagging für Regression
-
-
-# - Ziehe B Bootstrap-Samples (mit Zurücklegen)
-# - Baue auf jedem Sample einen Regressions-Baum
-# - Finale Vorhersage = Mittelwert aller Baum-Vorhersagen
-#
-# Parameter:
-#   X: Matrix oder data.frame mit Features (n x d)
-#   y: Vektor mit Zielwerten (Länge n)
-#   B: Anzahl Bootstrap-Samples (Standard: 100)
-#   ...: Weitere Parameter für fit_greedy_cart_regression (max_splits, min_leaf_size,...)
-#
-# Rückgabe:
-#   Objekt der Klasse "bagging_regression" mit:
-#     - trees: Liste der B trainierten Bäume
-#     - B: Anzahl der Bäume
-#
+#' Bagging für Regression
+#'
+#' - Ziehe B Bootstrap-Samples (mit Zurücklegen)
+#' - Baue auf jedem Sample einen Regressions-Baum
+#' - Finale Vorhersage = Mittelwert aller Baum-Vorhersagen
+#'
+#' @param Parameter:
+#'   X: Matrix oder data.frame mit Features (n x d)
+#'   y: Vektor mit Zielwerten (Länge n)
+#'   B: Anzahl Bootstrap-Samples (Standard: 100)
+#'  ...: Weitere Parameter für fit_greedy_cart_regression (max_splits, min_leaf_size,...)
+#'
+#' @return Rückgabe:
+#'   Objekt der Klasse "bagging_regression" mit:
+#'     - trees: Liste der B trainierten Bäume
+#'     - B: Anzahl der Bäume
+#' @export
 bagging_regression <- function(X, y, B = 100, ...) {
 
   # Eingabe-Validierung
@@ -71,20 +67,20 @@ bagging_regression <- function(X, y, B = 100, ...) {
 }
 
 
-# Vorhersage-Funktion für Bagging
-
-#
-# Implementiert die Aggregation aus Def 6.25:
-# f̂ₙᵇᵃᵍᵍ(x) = (1/B) * Σᵇ₌₁ᴮ f̂ₙ*ᵇ(x)
-#
-# Parameter:
-#   object: Bagging-Modell (von bagging_regression)
-#   newdata: Matrix/data.frame mit neuen Datenpunkten für Vorhersage
-#   ...: Weitere Parameter
-#
-# Rückgabe:
-#   Vektor mit Vorhersagen (Länge = Anzahl Zeilen in newdata)
-#
+#' @title Vorhersage-Funktion für Bagging
+#'
+#' @description Implementiert die Aggregation aus Def 6.25:
+#' f̂ₙᵇᵃᵍᵍ(x) = (1/B) * Σᵇ₌₁ᴮ f̂ₙ*ᵇ(x)
+#'
+#'@param Parameter:
+#'   object: Bagging-Modell (von bagging_regression)
+#'   newdata: Matrix/data.frame mit neuen Datenpunkten für Vorhersage
+#' ...: Weitere Parameter
+#'
+#'@return Rückgabe:
+#'   Vektor mit Vorhersagen (Länge = Anzahl Zeilen in newdata)
+#'
+#' @export
 predict.bagging_regression <- function(object, newdata, ...) {
 
   # Extrahiere Komponenten

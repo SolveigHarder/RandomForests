@@ -107,6 +107,8 @@ prune_weakest_link <- function(nodes, y, mode) {
 }
 
 # Generiert die gesamte Sequenz der gestutzten Bäume
+#' cost complexity sequence
+#' @export
 cost_complexity_sequence <- function(initial_nodes, y, mode) {
   stopifnot("Parameter 'mode' muss 'regression' oder 'classification' enthalten" = mode %in% c("regression", "classification"))
 
@@ -160,6 +162,8 @@ cost_complexity_sequence <- function(initial_nodes, y, mode) {
 # Automatische Lambdabestimmung (mit Cross-Validation) nach Bem. 6.21
 
 # Aus Lemma 6.20: Findet den Index p in der Sequenz, der R_n(f_T^(p)) + lambda * #T^(p) minimiert
+#' get optimal tree for lambda
+#' @export
 get_optimal_tree_for_lambda <- function(pruning_seq, lambda, y_train, mode) {
   P <- length(pruning_seq$trees)
   scores <- numeric(P)
@@ -184,7 +188,9 @@ get_optimal_tree_for_lambda <- function(pruning_seq, lambda, y_train, mode) {
   return(max(best_indices))
 }
 
-# Aus Bemerkung 6.21: M-Fold Cross-Validation
+#' Aus Bemerkung 6.21: M-Fold Cross-Validation
+#' cross validation optimal lambda
+#' @export
 cv_optimal_lambda <- function(X, y, fit, seq_full, mode, M = 5, max_splits = .Machine$integer.max) {
   n <- nrow(X)
 

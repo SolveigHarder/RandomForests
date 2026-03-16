@@ -136,7 +136,8 @@ new_node_class <- function(idx, y) {
 #   -> in jedem Schritt splitte das Blatt, das die größte Verbesserung bringt
 #
 #  passt zu "wir verringern das empirische Risiko am stärksten".
-
+#' Fit greedy CART classification tree
+#' @export
 fit_greedy_cart_classification <- function(X, y,
                                        max_splits = 10^9, #Buch Abbruch: nur wenn kein Blatt mehr splitbar ist
                                        min_leaf_size = 1,
@@ -227,7 +228,7 @@ fit_greedy_cart_classification <- function(X, y,
 # Prediction für greedy_cart_clas
 # Traversiere den Baum: bei innerem Knoten splitte nach (j,s),
 # bis ein Blatt erreicht ist, dann gib pred zurück.
-
+#' @export
 predict.greedy_cart_clas <- function(object, newdata, ...) {
   nodes <- object$nodes
   X <- as.matrix(newdata)

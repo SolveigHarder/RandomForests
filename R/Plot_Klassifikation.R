@@ -4,7 +4,9 @@ source("R/Pruning.R")
 # Originale Grafikparameter speichern
 .pardefault <- par(no.readonly = TRUE)
 
-# Funktion zum Plotten eines einzelnen Klassifikationsbaums (2D)
+#' Funktion zum Plotten eines einzelnen Klassifikationsbaums (2D)
+#' plot classification fit
+#' @export
 plot_classification_fit <- function(tree, X, y, title, input_func = NULL, res = 200) {
   stopifnot("Eingabe für Klassifikationsplot muss 2D sein" = ncol(X) == 2)
 

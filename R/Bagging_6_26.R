@@ -1,21 +1,19 @@
 # Bagging für Klassifikationsbäume per Majority Vote (Definition 6.26)
 
 source("R/GierigesVerf_Klassifikation.R")
-
-# Hauptfunktion: Bagging für Klassifikation
-#
-# Parameter:
-#   X: Matrix oder data.frame mit Features (n x d)
-#   y: Vektor mit Klassenlabels (Länge n)
-#   B: Anzahl Bootstrap-Samples (Standard: 100)
-#   ...: Weitere Parameter für fit_greedy_cart_classification (max_splits, min_leaf_size,...)
-#
-# Rückgabe:
-#   Objekt der Klasse "bagging_classification" mit:
-#     - trees: Liste der B trainierten Bäume
-#     - B: Anzahl der Bäume
-#     - levels: Klassenlabels
-#
+#' Bagging für Klassifikation
+#'
+#'@param Parameter:
+#'   X: Matrix oder data.frame mit Features (n x d)
+#'   y: Vektor mit Klassenlabels (Länge n)
+#'   B: Anzahl Bootstrap-Samples (Standard: 100)
+#'   ...: Weitere Parameter für fit_greedy_cart_classification (max_splits, min_leaf_size,...)
+#'@return Rückgabe:
+#'   Objekt der Klasse "bagging_classification" mit:
+#'     - trees: Liste der B trainierten Bäume
+#'     - B: Anzahl der Bäume
+#'     - levels: Klassenlabels
+#'@export
 bagging_classification <- function(X, y, B = 100, ...) {
 
   X <- as.data.frame(X)
@@ -55,11 +53,12 @@ bagging_classification <- function(X, y, B = 100, ...) {
 }
 
 
-# Vorhersage-Funktion für Bagging-Klassifikation
-#
-# Implementiert Majority Vote aus Def 6.26:
-# f̂ₙᵇᵃᵍᵍ(x) = argmax_k #{b ∈ {1,...,B} : f̂ₙ*ᵇ(x) = k}
-#
+#' Vorhersage-Funktion für Bagging-Klassifikation
+#'
+#' Implementiert Majority Vote aus Def 6.26:
+#' f̂ₙᵇᵃᵍᵍ(x) = argmax_k #{b ∈ {1,...,B} : f̂ₙ*ᵇ(x) = k}
+#'
+#' @export
 predict.bagging_classification <- function(object, newdata, ...) {
 
   B <- object$B

@@ -2,21 +2,20 @@
 # Benötigt: Def. 6.27 (predict_proba)
 
 source("R/GierigesVerf_Klassifikation.R")
-
-
-# Definition 6.27: Klassenwahrscheinlichkeiten eines Baums
-#
-# Traversiert den Baum wie predict, gibt aber pro Punkt
-# den Vektor p̂_k(A) = #{i : X_i ∈ A, Y_i = k} / #A zurück.
-#
-# Parameter:
-#   object:  Baum-Objekt (greedy_cart_clas)
-#   newdata: Matrix/data.frame mit neuen Datenpunkten
-#   y_train: Trainings-Labels (factor), die zum Fitten benutzt wurden
-#
-# Rückgabe:
-#   Matrix n_new x K mit Klassenwahrscheinlichkeiten
-#
+#' Definition 6.27: Klassenwahrscheinlichkeiten eines Baums
+#'
+#' Traversiert den Baum wie predict, gibt aber pro Punkt
+#' den Vektor p̂_k(A) = #{i : X_i ∈ A, Y_i = k} / #A zurück.
+#'
+#'@param Parameter:
+#'   object:  Baum-Objekt (greedy_cart_clas)
+#'   newdata: Matrix/data.frame mit neuen Datenpunkten
+#'   y_train: Trainings-Labels (factor), die zum Fitten benutzt wurden
+#'
+#'@return Rückgabe:
+#' Matrix n_new x K mit Klassenwahrscheinlichkeiten
+#'
+#'@export
 predict_proba <- function(object, newdata, y_train) {
 
   nodes <- object$nodes
@@ -54,6 +53,8 @@ predict_proba <- function(object, newdata, y_train) {
 # p̂ᵇᵃᵍᵍ_k(x) = (1/B) * Σᵇ₌₁ᴮ p̂*ᵇ_k(x)
 # f̂ᵇᵃᵍᵍ(x)   = argmax_k p̂ᵇᵃᵍᵍ_k(x)
 #
+#' bagging classification probability
+#' @export
 bagging_classification_proba <- function(X, y, B = 100, ...) {
 
   X <- as.data.frame(X)
@@ -90,6 +91,8 @@ bagging_classification_proba <- function(X, y, B = 100, ...) {
 
 # Vorhersage: Mittelt Klassenwahrscheinlichkeiten, dann argmax
 #
+
+#' @export
 predict.bagging_classification_proba <- function(object, newdata, ...) {
 
   B     <- object$B

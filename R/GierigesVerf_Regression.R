@@ -118,7 +118,8 @@ new_node <- function(idx, y) {
 #   -> in jedem Schritt splitte das Blatt, das die größte Verbesserung bringt
 #
 #  passt zu "wir verringern das empirische Risiko am stärksten".
-
+#' Fit greedy CART regression tree
+#' @export
 fit_greedy_cart_regression <- function(X, y,
                                        max_splits = 10^9, #Buch Abbruch: nur wenn kein Blatt mehr splitbar ist
                                        min_leaf_size = 1,
@@ -209,7 +210,7 @@ fit_greedy_cart_regression <- function(X, y,
 # Prediction für greedy_cart_reg
 # Traversiere den Baum: bei innerem Knoten splitte nach (j,s),
 # bis ein Blatt erreicht ist, dann gib pred zurück.
-
+#' @export
 predict.greedy_cart_reg <- function(object, newdata, ...) {
   nodes <- object$nodes
   X <- as.matrix(newdata)

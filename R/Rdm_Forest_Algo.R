@@ -2,25 +2,25 @@
 
 source("R/GierigesVerf_Regression.R")
 source("R/GierigesVerf_Klassifikation.R")
-
-# Hauptfunktion: Random Forests für Regression
-
-
-# - Ziehe B Bootstrap-Samples (mit Zurücklegen)
-# - Baue auf jedem Sample einen Regressions-Baum
-# - Finale Vorhersage = Mittelwert aller Baum-Vorhersagen
-#
-# Parameter:
-#   X: Matrix oder data.frame mit Features (n x d)
-#   y: Vektor mit Zielwerten (Länge n)
-#   B: Anzahl Bootstrap-Samples (Standard: 100)
-#   ...: Weitere Parameter für fit_greedy_cart_regression (max_splits, min_leaf_size,...)
-#
-# Rückgabe:
-#   Objekt der Klasse "random_forest_regression" mit:
-#     - trees: Liste der B trainierten Bäume
-#     - B: Anzahl der Bäume
-#
+#' Hauptfunktion: Random Forests für Regression
+#'
+#' - Ziehe B Bootstrap-Samples (mit Zurücklegen)
+#' - Baue auf jedem Sample einen Regressions-Baum
+#' - Finale Vorhersage = Mittelwert aller Baum-Vorhersagen
+#'
+#' @param Parameter:
+#'   X: Matrix oder data.frame mit Features (n x d)
+#'   y: Vektor mit Zielwerten (Länge n)
+#'   B: Anzahl Bootstrap-Samples (Standard: 100)
+#'   ...: Weitere Parameter für fit_greedy_cart_regression (max_splits, min_leaf_size,...)
+#'
+#' @return Rückgabe:
+#'   Objekt der Klasse "random_forest_regression" mit:
+#'     - trees: Liste der B trainierten Bäume
+#'     - B: Anzahl der Bäume
+#'
+#' random forest for regression using greedy CART
+#' @export
 random_forest_regression <- function(X, y, B = 100, mtry = NULL, A_n = NULL, ...) {
 
   # Eingabe-Validierung
@@ -73,20 +73,20 @@ random_forest_regression <- function(X, y, B = 100, mtry = NULL, A_n = NULL, ...
 }
 
 
-# Vorhersage-Funktion für Random Forests
-
-#
-# Implementiert die Aggregation aus Def 6.25:
-# f̂ₙᵇᵃᵍᵍ(x) = (1/B) * Σᵇ₌₁ᴮ f̂ₙ*ᵇ(x)
-#
-# Parameter:
-#   object: Bagging-Modell (von bagging_regression)
-#   newdata: Matrix/data.frame mit neuen Datenpunkten für Vorhersage
-#   ...: Weitere Parameter
-#
-# Rückgabe:
-#   Vektor mit Vorhersagen (Länge = Anzahl Zeilen in newdata)
-#
+#' Vorhersage-Funktion für Random Forests
+#'
+#' Implementiert die Aggregation aus Def 6.25:
+#' f̂ₙᵇᵃᵍᵍ(x) = (1/B) * Σᵇ₌₁ᴮ f̂ₙ*ᵇ(x)
+#'
+#' @param Parameter:
+#'   object: Bagging-Modell (von bagging_regression)
+#'   newdata: Matrix/data.frame mit neuen Datenpunkten für Vorhersage
+#'   ...: Weitere Parameter
+#'
+#' @return Rückgabe:
+#'   Vektor mit Vorhersagen (Länge = Anzahl Zeilen in newdata)
+#'
+#' @export
 predict.random_forest_regression <- function(object, newdata, ...) {
 
   # Extrahiere Komponenten
@@ -113,22 +113,24 @@ predict.random_forest_regression <- function(object, newdata, ...) {
   return(predictions)
 }
 
-# Hauptfunktion: Random Forests für Klassifikation
-#
-# Parameter:
-#   X: Matrix oder data.frame mit Features (n x d)
-#   y: Vektor mit Klassenlabels (Länge n)
-#   B: Anzahl Bootstrap-Samples (Standard: 100)
-#   mtry: Anzahl der zufällig ausgewählten Features pro Split
-#   A_n: Größe des Bootstrap-Samples (Standard: n)
-#   ...: Weitere Parameter für fit_greedy_cart_classification (max_splits, min_leaf_size,...)
-#
-# Rückgabe:
-#   Objekt der Klasse "random_forest_classification" mit:
-#     - trees: Liste der B trainierten Bäume
-#     - B: Anzahl der Bäume
-#     - levels: Klassenlabels
-#
+#' Hauptfunktion: Random Forests für Klassifikation
+#'
+#' @param Parameter:
+#'   X: Matrix oder data.frame mit Features (n x d)
+#'   y: Vektor mit Klassenlabels (Länge n)
+#'   B: Anzahl Bootstrap-Samples (Standard: 100)
+#'   mtry: Anzahl der zufällig ausgewählten Features pro Split
+#'   A_n: Größe des Bootstrap-Samples (Standard: n)
+#'   ...: Weitere Parameter für fit_greedy_cart_classification (max_splits, min_leaf_size,...)
+#'
+#' @return Rückgabe:
+#'   Objekt der Klasse "random_forest_classification" mit:
+#'     - trees: Liste der B trainierten Bäume
+#'     - B: Anzahl der Bäume
+#'     - levels: Klassenlabels
+#'
+#' random forest for classification using greedy CART
+#' @export
 random_forest_classification <- function(X, y, B = 100, mtry = NULL, A_n = NULL, ...) {
 
   # Eingabe-Validierung
@@ -180,7 +182,8 @@ random_forest_classification <- function(X, y, B = 100, mtry = NULL, A_n = NULL,
   )
 }
 
-# Vorhersage-Funktion für Random Forests-Klassifikation
+#' Vorhersage-Funktion für Random Forests-Klassifikation
+#' @export
 predict.random_forest_classification <- function(object, newdata, ...) {
   B <- object$B
   trees <- object$trees
