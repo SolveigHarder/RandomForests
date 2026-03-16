@@ -1,0 +1,468 @@
+---
+title: "Vignette zum Paket RandomForests"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette zum Paket RandomForests}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE
+)
+set.seed(1)
+```
+
+```{r paket-laden}
+library(RandomForests)
+```
+
+# Überblick über die verfügbaren Funktionen
+
+Das Paket stellt Kernfunktionen für vier zusammenhängende Bereiche bereit:
+
+-   **Greedy CART**
+    -   `fit_greedy_cart_regression()`
+    -   `predict.greedy_cart_reg()`
+    -   `fit_greedy_cart_classification()`
+    -   `predict.greedy_cart_clas()`
+-   **Pruning**
+    -   `cost_complexity_sequence()`
+    -   `get_optimal_tree_for_lambda()`
+    -   `cv_optimal_lambda()`
+-   **Bagging**
+    -   `bagging_regression()`
+    -   `predict.bagging_regression()`
+    -   `bagging_classification()`
+    -   `predict.bagging_classification()`
+    -   `predict_proba()`
+    -   `bagging_classification_proba()`
+    -   `predict.bagging_classification_proba()`
+-   **Random Forest**
+    -   `random_forest_regression()`
+    -   `predict.random_forest_regression()`
+    -   `random_forest_classification()`
+    -   `predict.random_forest_classification()`
+
+Im Folgenden werden diese Funktionen mit Beispielen auf öffentlich verfügbaren Datensätzen aus R illustriert. Für Regressionsbeispiele wird `mtcars` verwendet, für Klassifikationsbeispiele `iris`.
+
+# Greedy CART
+
+## `fit_greedy_cart_regression()`
+
+Mit `fit_greedy_cart_regression()` wird ein Regressionsbaum nach dem gierigen CART-Prinzip aufgebaut. In jedem Schritt wird global der Split gewählt, der die stärkste Reduktion des empirischen Fehlers bewirkt. Als Zielgröße wird dabei die Summe der quadrierten Fehler innerhalb der entstehenden Teilmengen verwendet.
+
+Wichtige Argumente sind:
+
+-   `X`: Merkmalsmatrix oder `data.frame`
+-   `y`: numerischer Zielvektor
+-   `max_splits`: maximale Anzahl an Splits
+-   `min_leaf_size`: minimale Blattgröße
+-   `min_improve`: minimale notwendige Verbesserung
+-   `print_splits`: steuert die Ausgabe der gewählten Splits
+
+```{r greedy-regression-fit}
+data(mtcars)
+
+X_reg <- mtcars[, c("disp", "hp", "wt")]
+y_reg <- mtcars$mpg
+
+fit_reg <- fit_greedy_cart_regression(
+  X = X_reg,
+  y = y_reg,
+  max_splits = 4,
+  min_leaf_size = 3,
+  print_splits = FALSE
+)
+
+class(fit_reg)
+length(fit_reg$nodes)
+```
+
+Die Ausgabe ist ein Objekt der Klasse `"greedy_cart_reg"`, das die Baumstruktur in Form einer Knotenliste speichert.
+
+## `predict.greedy_cart_reg()`
+
+`predict.greedy_cart_reg()` erzeugt Vorhersagen für einen zuvor trainierten Regressionsbaum. Jeder neue Punkt wird entlang der gespeicherten Split-Regeln bis in ein Blatt geführt; dort wird der im Blatt gespeicherte Mittelwert zurückgegeben.
+
+```{r greedy-regression-predict}
+pred_reg <- predict(
+   fit_reg,
+   X_reg[1:6, , drop = FALSE]
+)
+
+pred_reg
+```
+
+Damit lässt sich unmittelbar nachvollziehen, welche Werte der Baum für neue Beobachtungen liefert.
+
+## `fit_greedy_cart_classification()`
+
+Mit `fit_greedy_cart_classification()` wird ein Klassifikationsbaum trainiert. Der Ablauf entspricht dem greedy CART für Regression, nur dass als Gütemaß nicht die quadratische Abweichung, sondern die Fehlklassifikationsanzahl nach Majority Vote in den Kindknoten minimiert wird.
+
+Wichtige Argumente sind:
+
+-   `X`: Merkmalsmatrix oder `data.frame`
+-   `y`: Klassenlabels
+-   `max_splits`: maximale Anzahl an Splits
+-   `min_leaf_size`: minimale Blattgröße
+-   `min_improve`: minimale notwendige Verbesserung
+-   `print_splits`: steuert die Ausgabe der Splits
+
+```{r greedy-classification-fit}
+data(iris)
+
+X_cl <- iris[, 1:4]
+y_cl <- iris$Species
+
+fit_cl <- fit_greedy_cart_classification(
+  X = X_cl,
+  y = y_cl,
+  max_splits = 4,
+  min_leaf_size = 5,
+  print_splits = FALSE
+)
+
+class(fit_cl)
+length(fit_cl$nodes)
+```
+
+Die Funktion gibt ein Objekt der Klasse `"greedy_cart_clas"` zurück, in dem sowohl die Baumstruktur als auch die Klassenniveaus gespeichert sind.
+
+## `predict.greedy_cart_clas()`
+
+`predict.greedy_cart_clas()` erzeugt Klassenvorhersagen für einen greedy-Klassifikationsbaum. Wie in der Regressionsvariante wird jeder Punkt bis zu einem Blatt traversiert; dort wird dann die gespeicherte Mehrheitsklasse zurückgegeben.
+
+```{r greedy-classification-predict}
+pred_cl <- predict(
+   fit_cl,
+   X_cl[1:10, ]
+)
+
+pred_cl
+```
+
+Damit erhält man direkt die Klassenlabels, die der Baum den neuen Beobachtungen zuweist.
+
+# Pruning
+
+## `cost_complexity_sequence()`
+
+`cost_complexity_sequence()` berechnet die Folge gestutzter Teilbäume entlang der Cost-Complexity-Pruning-Sequenz. Ausgangspunkt ist ein bereits trainierter voller Baum. Danach wird iterativ der schwächste Link entfernt, also der Teilbaum, dessen Pruning die kleinste Erhöhung des penalisierten Fehlers verursacht.
+
+Wichtige Argumente sind:
+
+-   `initial_nodes`: Knotenliste eines trainierten Baums
+-   `y`: Zielwerte des Trainingsdatensatzes
+-   `mode`: `"regression"` oder `"classification"`
+
+Im folgenden Beispiel wird die Sequenz für den zuvor trainierten Regressionsbaum berechnet.
+
+```{r pruning-sequence}
+seq_reg <- cost_complexity_sequence(
+  initial_nodes = fit_reg$nodes,
+  y = y_reg,
+  mode = "regression"
+)
+
+length(seq_reg$trees)
+seq_reg$lambdas
+```
+
+Die Rückgabe enthält die Folge der Teilbäume in `trees` und die zugehörigen Komplexitätsparameter in `lambdas`.
+
+## `get_optimal_tree_for_lambda()`
+
+`get_optimal_tree_for_lambda()` wählt aus einer bereits berechneten Pruning-Sequenz denjenigen Teilbaum aus, der für ein gegebenes `lambda` das Kriterium
+
+$$
+R_n(T) + \lambda \cdot |T|
+$$
+
+minimiert. Dabei ist $R_n(T)$ das empirische Risiko und $|T|$ die Anzahl der Blätter.
+
+```{r optimal-tree-lambda}
+best_tree_idx <- get_optimal_tree_for_lambda(
+  pruning_seq = seq_reg,
+  lambda = seq_reg$lambdas[1],
+  y_train = y_reg,
+  mode = "regression"
+)
+
+best_tree_idx
+```
+
+Das Ergebnis ist der Index des optimalen Teilbaums innerhalb der zuvor berechneten Pruning-Sequenz.
+
+## `cv_optimal_lambda()`
+
+`cv_optimal_lambda()` bestimmt einen geeigneten Komplexitätsparameter `lambda` per M-facher Cross-Validation. Dafür werden auf den Trainingsfalten erneut volle Bäume geschätzt, deren Pruning-Sequenzen berechnet und anschließend für eine Menge von `lambda`-Werten die Validierungsfehler verglichen.
+
+Wichtige Argumente sind:
+
+-   `X`: Eingabedaten
+-   `y`: Zielwerte
+-   `fit`: voller Ausgangsbaum
+-   `seq_full`: vollständige Pruning-Sequenz
+-   `mode`: `"regression"` oder `"classification"`
+-   `M`: Anzahl der Folds
+-   `max_splits`: maximale Split-Zahl für die Bäume in den Folds
+
+```{r cv-lambda}
+cv_reg <- cv_optimal_lambda(
+  X = X_reg,
+  y = y_reg,
+  fit = fit_reg,
+  seq_full = seq_reg,
+  mode = "regression",
+  M = 3,
+  max_splits = 4
+)
+
+names(cv_reg)
+cv_reg$best_lambda
+```
+
+Damit lässt sich ein datengetriebener Wert für den Pruning-Parameter auswählen.
+
+# Bagging
+
+## `bagging_regression()`
+
+`bagging_regression()` implementiert Bagging für Regressionsbäume. Es werden `B` Bootstrap-Stichproben gezogen, auf jeder Stichprobe wird ein Regressionsbaum trainiert, und die endgültige Vorhersage entsteht später durch Mittelung über alle Bäume.
+
+Wichtige Argumente sind:
+
+-   `X`: Merkmalsdaten
+-   `y`: numerischer Zielvektor
+-   `B`: Anzahl der Bootstrap-Stichproben
+-   `...`: weitere Argumente für `fit_greedy_cart_regression()`
+
+```{r bagging-regression-fit}
+bag_reg <- bagging_regression(
+  X = X_reg,
+  y = y_reg,
+  B = 20,
+  max_splits = 4,
+  min_leaf_size = 3,
+  print_splits = FALSE
+)
+
+class(bag_reg)
+bag_reg$B
+length(bag_reg$trees)
+```
+
+Die Rückgabe ist ein Objekt der Klasse `"bagging_regression"` mit allen trainierten Einzelbäumen.
+
+## `predict.bagging_regression()`
+
+`predict.bagging_regression()` erzeugt Vorhersagen für ein Bagging-Regressionsmodell. Zunächst sagt jeder einzelne Baum separat voraus; anschließend werden diese Einzelvorhersagen gemittelt.
+
+```{r bagging-regression-predict}
+pred_bag_reg <- predict(
+   bag_reg,
+   X_reg[1:6, , drop = FALSE]
+)
+
+pred_bag_reg
+```
+
+Dadurch wird die hohe Varianz einzelner Bäume reduziert.
+
+## `bagging_classification()`
+
+`bagging_classification()` implementiert Bagging für Klassifikationsbäume. Auf jeder Bootstrap-Stichprobe wird ein Klassifikationsbaum trainiert. Die endgültige Vorhersage entsteht dann über Majority Vote.
+
+```{r bagging-classification-fit}
+bag_cl <- bagging_classification(
+  X = X_cl,
+  y = y_cl,
+  B = 20,
+  max_splits = 4,
+  min_leaf_size = 5,
+  print_splits = FALSE
+)
+
+class(bag_cl)
+bag_cl$B
+length(bag_cl$trees)
+```
+
+Die Funktion gibt ein Objekt der Klasse `"bagging_classification"` zurück.
+
+## `predict.bagging_classification()`
+
+`predict.bagging_classification()` sammelt für jede neue Beobachtung die Einzelvorhersagen aller Bäume und bestimmt daraus die Klasse mit den meisten Stimmen.
+
+```{r bagging-classification-predict}
+pred_bag_cl <- predict(
+   bag_cl,
+   X_cl[1:10, ]
+)
+
+pred_bag_cl
+```
+
+Damit lässt sich die aggregierte Klassenvorhersage eines Bagging-Modells direkt ausgeben.
+
+## `predict_proba()`
+
+`predict_proba()` berechnet für einen einzelnen Klassifikationsbaum keine harten Klassenlabels, sondern Klassenwahrscheinlichkeiten. Für jedes Blatt wird dazu die relative Häufigkeit der Klassen unter den Trainingspunkten in diesem Blatt bestimmt.
+
+```{r predict-proba-example}
+proba_single <- predict_proba(
+  object = fit_cl,
+  newdata = X_cl[1:5, ],
+  y_train = y_cl
+)
+
+proba_single
+```
+
+Die Rückgabe ist eine Matrix, deren Zeilen Beobachtungen und deren Spalten Klassen entsprechen.
+
+## `bagging_classification_proba()`
+
+`bagging_classification_proba()` implementiert Bagging für Klassifikation auf Basis gemittelter Klassenwahrscheinlichkeiten. Im Unterschied zum Majority Vote werden also zunächst pro Baum Klassenwahrscheinlichkeiten geschätzt und erst danach über die Bäume hinweg gemittelt.
+
+```{r bagging-classification-proba-fit}
+bag_cl_proba <- bagging_classification_proba(
+  X = X_cl,
+  y = y_cl,
+  B = 20,
+  max_splits = 4,
+  min_leaf_size = 5,
+  print_splits = FALSE
+)
+
+class(bag_cl_proba)
+bag_cl_proba$B
+length(bag_cl_proba$trees)
+```
+
+Die Rückgabe ist ein Objekt der Klasse `"bagging_classification_proba"`.
+
+## `predict.bagging_classification_proba()`
+
+`predict.bagging_classification_proba()` mittelt zunächst die Klassenwahrscheinlichkeiten aller Bäume und wählt dann je Beobachtung die Klasse mit der höchsten mittleren Wahrscheinlichkeit.
+
+```{r bagging-classification-proba-predict}
+pred_bag_cl_proba <- predict(
+   bag_cl_proba,
+   X_cl[1:10, ]
+)
+
+pred_bag_cl_proba
+```
+
+Dieses Vorgehen ist eine Alternative zum direkten Majority Vote.
+
+# Random Forest
+
+## `random_forest_regression()`
+
+`random_forest_regression()` erweitert Bagging um zusätzliche Zufälligkeit. Neben der Stichprobenziehung pro Baum wird an jedem Split nur eine zufällige Teilmenge der Merkmale betrachtet. Zusätzlich kann über `A_n` gesteuert werden, wie groß die Stichprobe pro Baum sein soll.
+
+Wichtige Argumente sind:
+
+-   `X`: Merkmalsdaten
+-   `y`: numerischer Zielvektor
+-   `B`: Anzahl der Bäume
+-   `mtry`: Anzahl zufällig ausgewählter Merkmale pro Split
+-   `A_n`: Stichprobengröße pro Baum
+-   `...`: weitere Argumente für `fit_greedy_cart_regression()`
+
+```{r rf-regression-fit}
+rf_reg <- random_forest_regression(
+  X = X_reg,
+  y = y_reg,
+  B = 30,
+  mtry = 2,
+  A_n = nrow(X_reg),
+  max_splits = 4,
+  min_leaf_size = 3,
+  print_splits = FALSE
+)
+
+class(rf_reg)
+rf_reg$B
+length(rf_reg$trees)
+```
+
+Die Funktion gibt ein Objekt der Klasse `"random_forest_regression"` zurück.
+
+## `predict.random_forest_regression()`
+
+`predict.random_forest_regression()` erzeugt Vorhersagen für einen Random Forest in der Regression. Wie beim Bagging werden die Einzelvorhersagen aller Bäume gemittelt.
+
+```{r rf-regression-predict}
+pred_rf_reg <- predict(
+   rf_reg,
+   X_reg[1:6, , drop = FALSE]
+)
+
+pred_rf_reg
+```
+
+Damit lässt sich die aggregierte Vorhersage des Waldes direkt ausgeben.
+
+## `random_forest_classification()`
+
+`random_forest_classification()` ist das Analogon für Klassifikationsprobleme. Es werden viele Klassifikationsbäume auf resampleten Daten trainiert, und bei jedem Split wird nur eine zufällige Teilmenge der Merkmale geprüft.
+
+```{r rf-classification-fit}
+rf_cl <- random_forest_classification(
+  X = X_cl,
+  y = y_cl,
+  B = 30,
+  mtry = 2,
+  A_n = nrow(X_cl),
+  max_splits = 4,
+  min_leaf_size = 5,
+  print_splits = FALSE
+)
+
+class(rf_cl)
+rf_cl$B
+length(rf_cl$trees)
+```
+
+Die Funktion gibt ein Objekt der Klasse `"random_forest_classification"` zurück.
+
+## `predict.random_forest_classification()`
+
+`predict.random_forest_classification()` sammelt die Klassenvorhersagen aller Bäume und bestimmt daraus über Majority Vote die endgültige Klasse.
+
+```{r rf-classification-predict}
+pred_rf_cl <- predict(
+   rf_cl,
+   X_cl[1:10, ]
+)
+
+pred_rf_cl
+```
+
+# Shiny-App
+
+## `run_shiny_app()`
+
+Mit `run_shiny_app()` kann die im Paket enthaltene Shiny-App direkt gestartet werden.\
+Die Funktion dient als Einstiegspunkt für eine interaktive Nutzung des Pakets. Dabei wird der App-Ordner innerhalb des Pakets gesucht und anschließend mit `shiny::runApp()` gestartet.
+
+Die Funktion ist vor allem dann nützlich, wenn die Kernmethoden des Pakets nicht nur skriptbasiert, sondern auch über eine grafische Oberfläche ausprobiert werden sollen.
+
+Wichtige Punkte zur Verwendung sind:
+
+-   Das Paket `shiny` muss installiert sein.
+-   Die App muss im Paket an der vorgesehenen Stelle abgelegt sein.
+-   Der Start erfolgt direkt über die exportierte Funktion, ohne dass der Pfad zur App manuell angegeben werden muss.
+
+```{r shiny-app, eval=FALSE}
+run_shiny_app()
+```
+
+Durch den Aufruf öffnet sich die interaktive Anwendung, über die die im Paket implementierten Verfahren benutzergeführt ausgeführt werden können.
